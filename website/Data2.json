@@ -1,0 +1,162 @@
+{
+    "sensor": {
+        "2025-03-10T21:47:26+07:00": {
+            "alter": "32",
+            "cholestrol": "175",
+            "glucose": "153",
+            "heart": "78",
+            "idmicro": "23232",
+            "timestamp": "2025-03-10T21:47:26+07:00",
+            "urid": "4.9",
+            "label": "normal"
+        },
+        "2025-02-18T21:47:26+07:00": {
+            "alter": "32",
+            "cholestrol": "178",
+            "glucose": "160",
+            "heart": "80",
+            "idmicro": "23232",
+            "timestamp": "2025-02-18T21:47:26+07:00",
+            "urid": "5.0",
+            "label": "normal"
+        },
+        "2024-09-10T21:47:26+07:00": {
+            "alter": "31",
+            "cholestrol": "172",
+            "glucose": "165",
+            "heart": "76",
+            "idmicro": "23232",
+            "timestamp": "2024-09-10T21:47:26+07:00",
+            "urid": "5.1",
+            "label": "normal"
+        },
+        "2024-03-10T21:47:26+07:00": {
+            "alter": "30",
+            "cholestrol": "170",
+            "glucose": "158",
+            "heart": "72",
+            "idmicro": "23232",
+            "timestamp": "2024-03-10T21:47:26+07:00",
+            "urid": "4.8",
+            "label": "normal"
+        },
+        "2000-04-04T21:49:57+07:00": {
+            "alter": "50",
+            "cholestrol": "176",
+            "glucose": "159",
+            "heart": "65",
+            "idmicro": "23232",
+            "timestamp": "2000-04-04T21:49:57+07:00",
+            "urid": "5.1",
+            "label": "normal"
+        },
+        "2025-03-10T21:50:00+07:00": {
+            "alter": "40",
+            "cholestrol": "165",
+            "glucose": "140",
+            "heart": "75",
+            "idmicro": "131231",
+            "timestamp": "2025-03-10T21:50:00+07:00",
+            "urid": "5.0",
+            "label": "normal"
+        },
+        "2025-02-18T21:50:00+07:00": {
+            "alter": "40",
+            "cholestrol": "168",
+            "glucose": "145",
+            "heart": "78",
+            "idmicro": "131231",
+            "timestamp": "2025-02-18T21:50:00+07:00",
+            "urid": "5.2",
+            "label": "normal"
+        },
+        "2024-09-10T21:50:00+07:00": {
+            "alter": "39",
+            "cholestrol": "163",
+            "glucose": "148",
+            "heart": "73",
+            "idmicro": "131231",
+            "timestamp": "2024-09-10T21:50:00+07:00",
+            "urid": "5.1",
+            "label": "normal"
+        },
+        "2024-03-10T21:50:00+07:00": {
+            "alter": "38",
+            "cholestrol": "160",
+            "glucose": "150",
+            "heart": "70",
+            "idmicro": "131231",
+            "timestamp": "2024-03-10T21:50:00+07:00",
+            "urid": "5.0",
+            "label": "normal"
+        },
+        "2025-03-10T21:52:00+07:00": {
+            "alter": "28",
+            "cholestrol": "210",
+            "glucose": "220",
+            "heart": "110",
+            "idmicro": "11111",
+            "timestamp": "2025-03-10T21:52:00+07:00",
+            "urid": "6.5",
+            "label": "red"
+        },
+        "2024-12-15T21:47:26+07:00": {
+            "alter": "25",
+            "cholestrol": "205",
+            "glucose": "210",
+            "heart": "102",
+            "idmicro": "11111",
+            "timestamp": "2024-12-15T21:47:26+07:00",
+            "urid": "7.0",
+            "label": "red"
+        },
+        "2023-08-05T21:47:26+07:00": {
+            "alter": "45",
+            "cholestrol": "190",
+            "glucose": "195",
+            "heart": "58",
+            "idmicro": "11111",
+            "timestamp": "2023-08-05T21:47:26+07:00",
+            "urid": "8.0",
+            "label": "red"
+        }
+    },
+    "users": {
+        "hadsad@gmail_com": {
+            "email": "hadsad@gmail.com",
+            "idmicro": "131231",
+            "password": "AnjingBabi@76",
+            "username": "komeng"
+        },
+        "halo1@gmail_com": {
+            "email": "halo1@gmail.com",
+            "idmicro": "123",
+            "password": "AnjingBabi@76",
+            "username": "makan"
+        },
+        "halo2@gmail_com": {
+            "email": "halo2@gmail.com",
+            "idmicro": "23232",
+            "password": "AnjingBabi@76",
+            "username": "WILDAN PRATAMA"
+        },
+        "halo3@gmail_com": {
+            "email": "halo3@gmail.com",
+            "idmicro": "8887",
+            "password": "AnjingBabi@76",
+            "username": "makan222"
+        },
+        "halo9009999@gmail_com": {
+            "email": "halo9009999@gmail.com",
+            "idmicro": "12312",
+            "password": "AnjingBabi@76",
+            "username": "makan"
+        },
+        "halo9999@gmail_com": {
+            "email": "halo9999@gmail.com",
+            "idmicro": "121313",
+            "password": "AnjingBabi@76",
+            "username": "powqewq"
+        }
+    }
+}

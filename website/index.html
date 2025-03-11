@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <script type="module" src="./config-sdk.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header dengan username dan tombol logout -->
+        <div class="header">
+            <div class="username">Selamat datang, <span id="usernameDisplay"></span></div>
+            <button class="logout-btn" id="logoutButton">Logout</button>
+        </div>
+
+        <!-- Filter Waktu -->
+        <div>
+            <label for="filterSelect">Pilih Filter Waktu: </label>
+            <select id="filterSelect">
+                <option value="alltime">Seluruh Waktu</option>
+                <option value="today">Hari ini</option>
+                <option value="3weeks">3 Minggu yang lalu</option>
+                <option value="6months">6 Bulan yang lalu</option>
+                <option value="1year">1 Tahun yang lalu</option>
+            </select>
+        </div>
+        <!-- Tombol Urutkan -->
+        <div>
+            <label>Pilih Kolom untuk Diurutkan: </label>
+            <select id="sortColumn">
+                <option value="glucose">Glucose</option>
+                <option value="urid">Asam Uric</option>
+                <option value="cholestrol">Kolesterol</option>
+            </select>
+            <button id="sortAsc">↑ Urut Naik</button>
+            <button id="sortDesc">↓ Urut Turun</button>
+        </div>
+
+        <!-- Tabel -->
+        <table>
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Alter</th>
+                    <th>Heart Rate</th>
+                    <th>Glucose</th>
+                    <th>Urid Acid</th>
+                    <th>Cholesterol</th>
+                    <th>Waktu</th>
+                </tr>
+            </thead>
+            <tbody id="sensorData">
+                <!-- Data akan diisi di sini -->
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+        import { app } from "./config-sdk.js";
+
+        // Cek apakah pengguna sudah login, jika tidak, kembalikan ke `masuk.html`
+        if (localStorage.getItem('isLoggedIn') !== 'true') {
+            window.location.href = 'masuk.html';
+        }
+
+        // Mencegah kembali ke halaman login dengan tombol "Back"
+        history.pushState(null, null, window.location.href);
+        window.addEventListener('popstate', function () {
+            history.pushState(null, null, window.location.href);
+        });
+
+        // Menampilkan username yang tersimpan
+        const usernameDisplay = document.getElementById('usernameDisplay');
+        const storedUsername = localStorage.getItem('username');
+        if (storedUsername) {
+            usernameDisplay.textContent = storedUsername;
+        }
+
+        // Tombol Logout
+        const logoutButton = document.getElementById('logoutButton');
+        logoutButton.addEventListener('click', () => {
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('username');
+            localStorage.removeItem('idmicro');
+            window.location.href = 'masuk.html';
+        });
+
+        const db = getDatabase(app);
+        const sensorRef = ref(db, 'sensor');
+        const user_idmicro = String(localStorage.getItem('idmicro')); 
+        console.log("User idmicro dari localStorage:", user_idmicro);
+
+        const tableBody = document.getElementById('sensorData');
+
+        // Fungsi untuk menormalkan timestamp
+        function normalizeTimestamp(timestamp) {
+            return timestamp.replace(/\+07:0$/, "+07:00");
+        }
+
+        // Fungsi untuk memformat timestamp ke format Indonesia
+        function formatTimestamp(rawTimestamp) {
+            if (!rawTimestamp) return "Timestamp Tidak Valid";
+            const normalizedTimestamp = normalizeTimestamp(rawTimestamp);
+            
+            // Parsing timestamp secara manual untuk menghindari konversi timezone otomatis
+            const timestampMatch = normalizedTimestamp.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\+07:00$/);
+            if (!timestampMatch) return "Format Timestamp Tidak Valid";
+            
+            const [_, year, month, day, hours, minutes] = timestampMatch;
+            
+            const months = [
+                "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+            ];
+            
+            // Menggunakan nilai bulan yang sebenarnya (dikurangi 1 karena array dimulai dari 0)
+            const monthName = months[parseInt(month) - 1];
+            
+            // Menggunakan jam dan menit langsung dari timestamp tanpa konversi
+            return `${parseInt(day)} ${monthName} ${year}, ${hours}.${minutes} WIB`;
+        }
+
+        // Fungsi mendapatkan batas waktu filter
+        function getDateLimit(timeFilter) {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Reset ke awal hari ini di zona waktu lokal (GMT+0700)
+            let dateLimit = new Date(now.getTime()); // Salinan dalam milidetik
+
+            switch (timeFilter) {
+                case 'today':
+                    break; // Tetap awal hari ini
+                case '3weeks':
+                    dateLimit.setDate(dateLimit.getDate() - 21);
+                    break;
+                case '6months':
+                    dateLimit.setMonth(dateLimit.getMonth() - 6);
+                    break;
+                case '1year':
+                    dateLimit.setFullYear(dateLimit.getFullYear() - 1);
+                    break;
+                default:
+                    dateLimit = new Date(0); // alltime
+                    break;
+            }
+            console.log("Batas waktu filter untuk", timeFilter, ":", dateLimit.toISOString());
+            return dateLimit;
+        }
+
+        // Fungsi menampilkan tabel dengan penanda merah
+        function renderTable(data) {
+            tableBody.innerHTML = '';
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7">Tidak ada data yang cocok</td></tr>';
+                return;
+            }
+            let rowNum = 1;
+            data.forEach(entry => {
+                const formattedTimestamp = formatTimestamp(entry.timestamp);
+                
+                // Konversi nilai ke float untuk perbandingan
+                const cholesterol = parseFloat(entry.cholestrol);
+                const glucose = parseFloat(entry.glucose);
+                const heart = parseFloat(entry.heart);
+                const urid = parseFloat(entry.urid);
+
+                // Tentukan apakah nilai perlu ditandai merah
+                const cholesterolDisplay = cholesterol > 200 ? `<span style="color: red;">${entry.cholestrol}</span>` : entry.cholestrol;
+                const glucoseDisplay = glucose > 200 ? `<span style="color: red;">${entry.glucose}</span>` : entry.glucose;
+                const heartDisplay = (heart < 60 || heart > 100) ? `<span style="color: red;">${entry.heart}</span>` : entry.heart;
+                const uridDisplay = (urid < 3.5 || urid > 7.2) ? `<span style="color: red;">${entry.urid}</span>` : entry.urid;
+
+                const row = `
+                    <tr>
+                        <td>${rowNum++}</td>
+                        <td>${entry.alter}</td>
+                        <td>${heartDisplay}</td>
+                        <td>${glucoseDisplay}</td>
+                        <td>${uridDisplay}</td>
+                        <td>${cholesterolDisplay}</td>
+                        <td>${formattedTimestamp}</td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // Fungsi utama untuk memperbarui tabel
+        async function updateTable(sortOrder = null) {
+            const timeFilter = document.getElementById('filterSelect').value;
+            const sortColumn = document.getElementById('sortColumn').value;
+
+            const snapshot = await get(sensorRef);
+            if (!snapshot.exists()) {
+                tableBody.innerHTML = '<tr><td colspan="7">Tidak ada data tersedia</td></tr>';
+                return;
+            }
+
+            const sensorData = snapshot.val();
+            let filteredSortedData = Object.values(sensorData).filter(entry => String(entry.idmicro) === user_idmicro);
+            console.log("Data yang sesuai dengan idmicro:", filteredSortedData);
+
+            // Filter berdasarkan waktu
+            const dateLimit = getDateLimit(timeFilter);
+            filteredSortedData = filteredSortedData.filter(entry => {
+                const normalizedTimestamp = normalizeTimestamp(entry.timestamp);
+                const entryDate = new Date(normalizedTimestamp);
+                const isAfterLimit = entryDate.getTime() >= dateLimit.getTime();
+                console.log(`Filter: ${normalizedTimestamp} >= ${dateLimit.toISOString()} ? ${isAfterLimit}`);
+                return isAfterLimit;
+            });
+
+            // Urutkan data
+            if (sortOrder) {
+                filteredSortedData.sort((a, b) => {
+                    const aValue = parseFloat(a[sortColumn]);
+                    const bValue = parseFloat(b[sortColumn]);
+                    if (isNaN(aValue) || isNaN(bValue)) return 0;
+                    if (aValue < bValue) return (sortOrder === 'asc') ? -1 : 1;
+                    if (aValue > bValue) return (sortOrder === 'asc') ? 1 : -1;
+                    const aTime = new Date(normalizeTimestamp(a.timestamp));
+                    const bTime = new Date(normalizeTimestamp(b.timestamp));
+                    return aTime - bTime; // Tiebreaker berdasarkan timestamp
+                });
+            } else {
+                filteredSortedData.sort((a, b) => {
+                    const aTime = new Date(normalizeTimestamp(a.timestamp));
+                    const bTime = new Date(normalizeTimestamp(b.timestamp));
+                    return bTime - aTime; // Urutan default: terbaru ke terlama
+                });
+            }
+
+            renderTable(filteredSortedData);
+        }
+
+        // Event listener untuk filter dan tombol urut
+        document.getElementById('filterSelect').addEventListener('change', () => updateTable());
+        document.getElementById('sortAsc').addEventListener('click', () => updateTable('asc'));
+        document.getElementById('sortDesc').addEventListener('click', () => updateTable('desc'));
+
+        // Tampilkan data awal
+        updateTable();
+    </script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar</title>
+    <script type="module" src="./config-sdk.js"></script>
+</head>
+<body>
+
+    <div class="signup-container">
+        <h2>Daftar Akun</h2>
+        <form id="signupForm">
+            <input type="text" id="username" placeholder="Username" required><br>
+            <input type="text" id="microcontroler" placeholder="ID Microcontroler" required><br>
+            <input type="email" id="email" placeholder="Email" required><br>
+            <input type="password" id="password" placeholder="Password" required><br>
+            <input type="password" id="confirm_password" placeholder="Konfirmasi Password" required><br>
+            <button type="submit">Daftar</button>
+        </form>
+        <p>Sudah punya akun? <a href="masuk.html">Masuk</a></p>
+    </div>
+
+    <script type="module">
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+        import { app } from "./config-sdk.js"; // Import app
+
+        const db = getDatabase(app);
+        const signupForm = document.getElementById('signupForm');
+
+        // Fungsi untuk memvalidasi dan memformat idmicro
+        function validateAndFormatIdMicro(idmicro) {
+            // Pastikan input adalah angka
+            if (!/^\d+$/.test(idmicro)) {
+                return {
+                    valid: false,
+                    message: 'ID Microcontroler harus berupa angka.'
+                };
+            }
+
+            // Konversi ke angka untuk memeriksa range
+            const idNumber = parseInt(idmicro, 10);
+            
+            // Periksa range (000-999)
+            if (idNumber < 0 || idNumber > 999) {
+                return {
+                    valid: false,
+                    message: 'ID Microcontroler harus antara 000 sampai 999.'
+                };
+            }
+
+            // Format ke 3 digit dengan padding 0 di depan
+            const formattedId = idNumber.toString().padStart(3, '0');
+            
+            return {
+                valid: true,
+                formattedId: formattedId
+            };
+        }
+
+        // Fungsi untuk memeriksa apakah idmicro sudah terdaftar
+        async function isIdMicroRegistered(idmicro) {
+            const usersRef = ref(db, 'users');
+            try {
+                const snapshot = await get(usersRef);
+                if (snapshot.exists()) {
+                    const users = snapshot.val();
+                    // Periksa semua pengguna untuk menemukan idmicro yang sama
+                    for (const userKey in users) {
+                        if (users[userKey].idmicro === idmicro) {
+                            return true; // idmicro sudah terdaftar
+                        }
+                    }
+                }
+                return false; // idmicro belum terdaftar
+            } catch (error) {
+                console.error("Error saat memeriksa ID Microcontroler:", error);
+                throw error;
+            }
+        }
+
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const rawIdMicro = document.getElementById('microcontroler').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            if (password !== confirmPassword) {
+                alert('Password dan Konfirmasi Password tidak sama.');
+                return;
+            }
+
+            // Validasi dan format idmicro
+            const idMicroResult = validateAndFormatIdMicro(rawIdMicro);
+            if (!idMicroResult.valid) {
+                alert(idMicroResult.message);
+                return;
+            }
+
+            const formattedIdMicro = idMicroResult.formattedId;
+
+            try {
+                // Periksa apakah idmicro sudah terdaftar
+                const idMicroExists = await isIdMicroRegistered(formattedIdMicro);
+                if (idMicroExists) {
+                    alert('ID Microcontroler sudah terdaftar. Silakan gunakan ID lain.');
+                    return;
+                }
+
+                // Create a valid Firebase key from the email. Replace invalid characters.
+                const emailKey = email.replace(/[.#$[\]]/g, '_');
+                const userRef = ref(db, `users/${emailKey}`);
+
+                // Periksa apakah email sudah terdaftar
+                const emailSnapshot = await get(userRef);
+                if (emailSnapshot.exists()) {
+                    alert('Email sudah terdaftar. Silakan gunakan email lain.');
+                    return;
+                } 
+
+                // Email dan idmicro belum terdaftar, lanjutkan pendaftaran
+                await set(userRef, {
+                    username: username,
+                    idmicro: formattedIdMicro, // Simpan dalam format 3 digit
+                    email: email,
+                    password: password // NEVER store plain text passwords in production.
+                });
+
+                alert('Pendaftaran berhasil!');
+                // Redirect ke halaman login
+                window.location.href = 'masuk.html';
+            } catch (error) {
+                console.error("Terjadi kesalahan:", error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
