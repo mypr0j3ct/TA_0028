@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk</title>
+     <script type="module" src="./config-sdk.js"></script>
+</head>
+<body>
+
+    <div class="login-container">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="email" id="email" placeholder="Email" required><br>
+            <input type="password" id="password" placeholder="Password" required><br>
+            <button type="submit">Masuk</button>
+        </form>
+        <p>Belum punya akun? <a href="daftar.html">Daftar</a></p>
+    </div>
+
+    <script type="module">
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+        import { app } from "./config-sdk.js";
+    
+        const db = getDatabase(app);
+        const loginForm = document.getElementById('loginForm');
+    
+        // Cek apakah pengguna sudah login sebelumnya
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            window.location.href = 'index.html';
+        }
+    
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+    
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+    
+            const emailKey = email.replace(/[.#$[\]]/g, '_');
+            const userRef = ref(db, `users/${emailKey}`);
+    
+            onValue(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    if (userData.password === password) {
+                        alert('Login berhasil!');
+                        localStorage.setItem('isLoggedIn', 'true');
+                        localStorage.setItem('username', userData.username);
+                        localStorage.setItem('idmicro', userData.idmicro);
+    
+                        // Mencegah pengguna kembali ke halaman login
+                        history.pushState(null, null, window.location.href);
+                        window.location.href = 'index.html';
+                    } else {
+                        alert('Password salah.');
+                    }
+                } else {
+                    alert('User tidak ditemukan.');
+                }
+            }, {
+                onlyOnce: true
+            });
+        });
+    
+        // Cegah kembali ke halaman masuk dengan tombol "Back"
+        window.addEventListener('popstate', function () {
+            history.pushState(null, null, window.location.href);
+        });
+    
+    </script>    
+    
+</body>
+</html>
