@@ -1,0 +1,11 @@
+
+usbipd bind --busid 1-2
+
+usbipd attach --busid 1-2 --wsl Ubuntu
+
+usbipd detach --busid 1-2
+
+
+dmesg | grep tty
+
+sudo chown ubuntu /dev/ttyUSB0
