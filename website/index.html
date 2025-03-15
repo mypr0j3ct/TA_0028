@@ -273,16 +273,19 @@
         import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
         import { app } from "./config-sdk.js";
 
-        // Cek apakah pengguna sudah login, jika tidak, kembalikan ke `masuk.html`
+        // Menghapus riwayat sebelumnya agar pengguna tidak bisa kembali ke halaman login
+        history.replaceState(null, null, window.location.href);
+
+        // Event popstate untuk menghindari navigasi ke halaman sebelumnya
+        window.addEventListener('popstate', function () {
+            console.log("Tombol back ditekan, kembali ke halaman saat ini!");
+            history.replaceState(null, null, window.location.href);
+        });
+
+        // Jika pengguna tidak login, paksa ke halaman login
         if (localStorage.getItem('isLoggedIn') !== 'true') {
             window.location.href = 'masuk.html';
         }
-
-        // Mencegah kembali ke halaman login dengan tombol "Back"
-        history.pushState(null, null, window.location.href);
-        window.addEventListener('popstate', function () {
-            history.pushState(null, null, window.location.href);
-        });
 
         // Menampilkan username yang tersimpan
         const usernameDisplay = document.getElementById('usernameDisplay');
