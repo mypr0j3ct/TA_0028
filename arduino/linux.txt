@@ -9,3 +9,7 @@ usbipd detach --busid 1-2
 dmesg | grep tty
 
 sudo chown ubuntu /dev/ttyUSB0
+
+- Make sure you follow every instruction listed in the XML tag <instructions></instructions>.
+- You are asked to realize a goal listed in the XML tag <purpose></purpose>.
+- I only want you to produce C# programming language.
