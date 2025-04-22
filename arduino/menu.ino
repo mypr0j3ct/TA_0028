@@ -8,31 +8,21 @@
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <Firebase_ESP_Client.h>
+#include <ArduinoEigen.h>
+#include <LiquidCrystal_I2C.h>
 #include "heartRate.h"
 #include "MAX30105.h"
-#include <LiquidCrystal_I2C.h>
-
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
 #define API_KEY "AIzaSyDX9FQQai2rWeUubCX903z-yPMro_TGTIQ"
 #define DATABASE_URL "https://projectv1-a9190-default-rtdb.asia-southeast1.firebasedatabase.app/"
-
 #define PUSH_BUTTON_1 18
 #define PUSH_BUTTON_3 5
 #define DEBOUNCE_DELAY 50
 #define FORMAT_LITTLEFS_IF_FAILED true
 
-DS3231 myRTC;
-FirebaseData fbdo;
-FirebaseAuth auth;
-IPAddress localIP;
-FirebaseConfig config;
-IPAddress localGateway;
-MAX30105 particleSensor;
-AsyncWebServer server(80);
-IPAddress subnet(255, 255, 0, 0);
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+using namespace Eigen;
 
 struct Button {
   int pin;
@@ -43,106 +33,57 @@ struct Button {
 };
 
 const uint8_t Age_MIN = 20;
-const uint8_t Age_MAX = 99;
-
-uint8_t menuIndex = 0;
-uint8_t cursorRow = 1;
-uint8_t umurr = 0;
-bool inSubMenu = false;
-bool initialized = false;
-unsigned long lastButtonPressTime = 0;
-const unsigned long BUTTON_DELAY = 200;
-const String menu[] = {"Mulai Ukur", "Upload Data", "Setting WiFi"};
-const int menuSize = sizeof(menu) / sizeof(menu[0]);
-const char* var2Path = "/data/value.txt";
-
-unsigned long startTime;
-bool isSettingAge = false;
-bool isSettingIdmicro = false;
-bool shouldRunBacaSensor = false;
-bool selesai_baca = false;
-uint8_t umur = Age_MIN;
-uint8_t inputStage = 0;
-uint8_t idmicroInputStage = 0;
-uint8_t idmicroDigits[3] = {0, 0, 0};
-String idmicro = "";
-
-Button button1 = {PUSH_BUTTON_1, HIGH, HIGH, 0, false};
-Button button3 = {PUSH_BUTTON_3, HIGH, HIGH, 0, false};
-
-double scaledHR_1, scaledIR_1, scaledUmur_1;
-double scaledHR_2, scaledIR_2, scaledUmur_2;
-double scaledHR_3, scaledIR_3, scaledUmur_3;
-double findValue_1, findValue_2, findValue_3;
-double sigmoid_1, sigmoid_2, sigmoid_3;
-
-uint8_t GLU, CHOL;
-float ACD;
+const uint8_t Age_MAX = 60;
 const byte RATE_SIZE = 4;
-byte rates[RATE_SIZE];
-byte irValues[RATE_SIZE];
-byte rateSpot = 0;
-long lastBeat = 0;
-float beatsPerMinute;
-int beatAvg;
-uint32_t irAvg;
-int HR = 0;
-uint64_t IR = 0;
-bool fingerDetected = false;
-unsigned long interval;
-int avgir, avgbpm;
-bool tampilkan_hasil;
-
-const uint8_t GLU_MIN = 82;
-const uint16_t GLU_MAX = 396;
-const uint8_t CHOL_MIN = 139;
-const uint8_t CHOL_MAX = 223;
-const float ACD_MIN = 3.8;
-const float ACD_MAX = 7;
-
-const uint8_t HR_MIN_1 = 66;
-const uint8_t HR_MAX_1 = 112;
-const uint8_t HR_MIN_2 = 66;
-const uint8_t HR_MAX_2 = 112;
-const uint8_t HR_MIN_3 = 66;
-const uint8_t HR_MAX_3 = 112;
-
-const uint32_t IR_MIN_1 = 86765;
-const uint32_t IR_MAX_1 = 107756;
-const uint32_t IR_MIN_2 = 86765;
-const uint32_t IR_MAX_2 = 107756;
-const uint32_t IR_MIN_3 = 86765;
-const uint32_t IR_MAX_3 = 107756;
-
-const float Age_Omega_1 = -0.04673855434301688;
-const float IR_Omega_1 = -0.4197309962951855;
-const float HR_Omega_1 = -0.2835012140361256;
-const float Bias_1 = -0.8315069733269372;
-
-const float Age_Omega_2 = 0.00850885812967044;
-const float IR_Omega_2 = -0.09736722986940606;
-const float HR_Omega_2 = -0.012682509022442733;
-const float Bias_2 = -0.176179293760974;
-
-const float Age_Omega_3 = 0.31296509375281173;
-const float IR_Omega_3 = -0.34460762103122644;
-const float HR_Omega_3 = -0.18902828792276205;
-const float Bias_3 = -0.42445516595368277;
-
+const unsigned long BUTTON_DELAY = 200;
+const long intervalWifi = 10000;
 const char* PARAM_INPUT_1 = "ssid";
 const char* PARAM_INPUT_2 = "pass";
 const char* PARAM_INPUT_3 = "ip";
 const char* PARAM_INPUT_4 = "gateway";
-
-String ssid;
-String pass;
-String ip;
-String gateway;
-
 const char* ssidPath = "/ssid.txt";
 const char* passPath = "/pass.txt";
 const char* ipPath = "/ip.txt";
 const char* gatewayPath = "/gateway.txt";
+const char* var2Path = "/data/value.txt";
+const String menu[] = {"Mulai Ukur", "Upload Data", "Setting WiFi"};
+const int menuSize = sizeof(menu) / sizeof(menu[0]);
+
+DS3231 myRTC;
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+MAX30105 particleSensor;
+AsyncWebServer server(80);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+IPAddress localIP;
+IPAddress localGateway;
+IPAddress subnet(255, 255, 0, 0);
+
+Button button1 = {PUSH_BUTTON_1, HIGH, HIGH, 0, false};
+Button button3 = {PUSH_BUTTON_3, HIGH, HIGH, 0, false};
+
+uint8_t menuIndex = 0;
+uint8_t cursorRow = 1;
+uint8_t umurr = 0;
+uint8_t umur = Age_MIN;
+uint8_t inputStage = 0;
+uint8_t idmicroInputStage = 0;
+uint8_t idmicroDigits[3] = {0, 0, 0};
+uint8_t GLU, CHOL;
+bool inSubMenu = false;
+bool initialized = false;
+bool isSettingAge = false;
+bool isSettingIdmicro = false;
+bool shouldRunBacaSensor = false;
+bool selesai_baca = false;
+bool fingerDetected = false;
+bool tampilkan_hasil;
+String idmicro = "";
+String ssid;
+String pass;
+String ip;
+String gateway;
 String idPath = "/idmicro";
 String gluPath = "/glucose";
 String cholPath = "/cholestrol";
@@ -151,8 +92,34 @@ String heartPath = "/heart";
 String alterPath = "/alter";
 String timePath = "/timestamp";
 
+unsigned long startTime;
+unsigned long lastButtonPressTime = 0;
 unsigned long previousMillis = 0;
-const long intervalWifi = 10000;
+unsigned long interval;
+long lastBeat = 0;
+float beatsPerMinute;
+int beatAvg;
+uint32_t irAvg;
+int HR = 0;
+uint64_t IR = 0;
+int avgir, avgbpm;
+float ACD;
+byte rates[RATE_SIZE];
+byte irValues[RATE_SIZE];
+byte rateSpot = 0;
+
+Vector3f xp1;
+Vector3f x_offset;
+Vector3f gain;
+VectorXf a1;
+VectorXf b1;
+MatrixXf IW1_1;
+RowVectorXf LW2_1;
+float a2;
+float y1;
+float b2;
+float y_gain;
+float y_xoffset;
 
 void startWiFiSetup();
 void initWiFi();
@@ -161,46 +128,40 @@ void saveDataToJson();
 void setupFirebase();
 void kirimDataKeFirebase();
 void syncTimeFromNTP();
+void showMainMenu();
+void returnToMainMenu();
+void handleSubMenu();
+void handleMainMenu();
+void updateAgeDisplay();
+void updateIdmicroDisplay();
+void bacasensorStep();
+String getTimestamp();
+uint8_t roundUpToUint8(float value);
+bool debounceButton(Button& button);
+float roundToOneDecimal(float value);
 void createDir(fs::FS &fs, const char *path);
-String readFile(fs::FS &fs, const char * path);
-void appendToFile(fs::FS &fs, const char *path, const char *message);
-void writeFile(fs::FS &fs, const char * path, const char * message);
-void deleteFile(fs::FS &fs, const char *path);
+String readFile(fs::FS &fs, const char *path);
 String readFile2(fs::FS &fs, const char *path);
+void writeFile(fs::FS &fs, const char *path, const char *message);
+void appendToFile(fs::FS &fs, const char *path, const char *message);
+void deleteFile(fs::FS &fs, const char *path);
 void copyValuu(uint8_t source, uint8_t& destination);
 void copyValue(uint64_t source, uint64_t& destination);
 void copyValuee(int source, int& destination);
-double minMaxScaling(double value, double min, double max);
-uint8_t RE_minMaxScaling(double value, double min, double max);
-float REE_minMaxScaling(double value, double min, double max);
-double findValue(double value1, double value2, double value3, double omega1, double omega2, double omega3, double omega4);
-double sigmoid(double value);
-void showMainMenu();
-void returnToMainMenu();
-void melihat();
-void handleSubMenu();
-void handleMainMenu();
-bool debounceButton(Button& button);
 void handleAgeInput(bool button1Pressed, bool button3Pressed);
-String getTimestamp();
-void updateAgeDisplay();
-void updateIdmicroDisplay();
 void handleIdmicroInput(bool button1Pressed, bool button3Pressed);
-void bacasensorStep();
+float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id);
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Initializing...");
+  lcd.init();
+  lcd.backlight();
   initLittleFS();
   createDir(LittleFS, "/data");
   String storedData = readFile2(LittleFS, var2Path);
   if (!particleSensor.begin(Wire)) {
-    Serial.println("MAX30105 tidak terdeteksi. Mohon periksa wiring/power.");
-    while (1);
+    while (1)
+      ;
   }
-  Serial.println("Letakkan jari di sensor dengan tekanan stabil.");
-  lcd.init();
-  lcd.backlight();
   pinMode(PUSH_BUTTON_1, INPUT_PULLUP);
   pinMode(PUSH_BUTTON_3, INPUT_PULLUP);
   byte ledBrightness = 45;
@@ -228,7 +189,8 @@ void loop() {
   if (button3Pressed) {
     if (!inSubMenu && cursorRow == 1) {
       handleSubMenu();
-    } else if (inSubMenu && !isSettingAge && !isSettingIdmicro && !shouldRunBacaSensor) { 
+    } else if (inSubMenu && !isSettingAge && !isSettingIdmicro &&
+               !shouldRunBacaSensor) {
       returnToMainMenu();
     }
   }
@@ -239,27 +201,16 @@ void loop() {
 }
 
 void initLittleFS() {
-  if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
-    Serial.println("Gagal memasang LittleFS");
-    return;
-  }
-  Serial.println("LittleFS berhasil dipasang");
+  LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED);
 }
 
 void createDir(fs::FS &fs, const char *path) {
-  Serial.printf("Membuat Direktori: %s\n", path);
-  if (fs.mkdir(path)) {
-    Serial.println("Direktori dibuat");
-  } else {
-    Serial.println("Gagal membuat direktori");
-  }
+  fs.mkdir(path);
 }
 
-String readFile(fs::FS &fs, const char * path) {
-  Serial.printf("Membaca file: %s\r\n", path);
+String readFile(fs::FS &fs, const char *path) {
   File file = fs.open(path);
   if (!file || file.isDirectory()) {
-    Serial.println("- Gagal membuka file untuk dibaca");
     return String();
   }
   String fileContent;
@@ -270,25 +221,17 @@ String readFile(fs::FS &fs, const char * path) {
   return fileContent;
 }
 
-void writeFile(fs::FS &fs, const char * path, const char * message) {
-  Serial.printf("Menulis file: %s\r\n", path);
+void writeFile(fs::FS &fs, const char *path, const char *message) {
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
-    Serial.println("- Gagal membuka file untuk ditulis");
     return;
   }
-  if (file.print(message)) {
-    Serial.println("- File berhasil ditulis");
-  } else {
-    Serial.println("- Gagal menulis file");
-  }
+  file.print(message);
 }
 
 String readFile2(fs::FS &fs, const char *path) {
-  Serial.printf("Membaca file: %s\n", path);
   File file = fs.open(path, FILE_READ);
   if (!file) {
-    Serial.println("Gagal membuka file untuk dibaca");
     return String();
   }
   String fileContent;
@@ -299,28 +242,17 @@ String readFile2(fs::FS &fs, const char *path) {
   return fileContent;
 }
 
-void appendToFile(fs::FS &fs, const char * path, const char * message) {
-  Serial.printf("Menambahkan ke file: %s\n", path);
+void appendToFile(fs::FS &fs, const char *path, const char *message) {
   File file = fs.open(path, FILE_APPEND);
   if (!file) {
-    Serial.println("Gagal membuka file untuk ditambahkan");
     return;
   }
-  if (file.println(message)) {
-    Serial.println("File berhasil ditambahkan");
-  } else {
-    Serial.println("Gagal menambahkan");
-  }
+  file.println(message);
   file.close();
 }
 
 void deleteFile(fs::FS &fs, const char *path) {
-  Serial.printf("Menghapus file: %s\r\n", path);
-  if (fs.remove(path)) {
-    Serial.println("- File dihapus");
-  } else {
-    Serial.println("- Gagal menghapus");
-  }
+  fs.remove(path);
 }
 
 void copyValuu(uint8_t source, uint8_t& destination) {
@@ -333,27 +265,6 @@ void copyValue(uint64_t source, uint64_t& destination) {
 
 void copyValuee(int source, int& destination) {
   destination = source;
-}
-
-double minMaxScaling(double value, double min, double max) {
-  return (value - min) / (max - min);
-}
-
-uint8_t RE_minMaxScaling(double value, double min, double max) {
-  return static_cast<uint8_t>((value * (max - min)) + min);
-}
-
-float REE_minMaxScaling(double value, double min, double max) {
-  float scaledValue = (value * (max - min)) + min;
-  return round(scaledValue * 10) / 10.0;
-}
-
-double findValue(double value1, double value2, double value3, double omega1, double omega2, double omega3, double omega4) {
-  return ((value1 * omega1) + (value2 * omega2) + (value3 * omega3) + omega4);
-}
-
-double sigmoid(double value) {
-  return 1.0 / (1.0 + exp(-value));
 }
 
 void showMainMenu() {
@@ -377,7 +288,6 @@ void returnToMainMenu() {
   beatsPerMinute = 0;
   beatAvg = 0;
   irAvg = 0;
-  Serial.println("Pengukuran direset.");
   WiFi.softAPdisconnect(true);
 }
 
@@ -531,17 +441,17 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
   }
 
   if (button1Pressed && millis() - lastButtonPressTime >= BUTTON_DELAY) {
-    if (idmicroInputStage == 0) { 
+    if (idmicroInputStage == 0) {
       idmicroDigits[0]++;
       if (idmicroDigits[0] > 9) {
         idmicroDigits[0] = 0;
       }
-    } else if (idmicroInputStage == 1) { 
+    } else if (idmicroInputStage == 1) {
       idmicroDigits[1]++;
       if (idmicroDigits[1] > 9) {
         idmicroDigits[1] = 0;
       }
-    } else if (idmicroInputStage == 2) { 
+    } else if (idmicroInputStage == 2) {
       idmicroDigits[2]++;
       if (idmicroDigits[2] > 9) {
         idmicroDigits[2] = 0;
@@ -565,7 +475,8 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
       updateIdmicroDisplay();
       idmicroInputStage = 2;
     } else if (idmicroInputStage == 2) {
-      idmicro = String(idmicroDigits[0]) + String(idmicroDigits[1]) + String(idmicroDigits[2]);
+      idmicro = String(idmicroDigits[0]) + String(idmicroDigits[1]) +
+                String(idmicroDigits[2]);
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("ID tersimpan:");
@@ -576,7 +487,7 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
       isSettingIdmicro = false;
       shouldRunBacaSensor = true;
       lcd.clear();
-      button3.isPressed = false; 
+      button3.isPressed = false;
     }
   }
 }
@@ -647,10 +558,6 @@ void bacasensorStep() {
   }
 
   if (tampilkan_hasil) {
-    Serial.print("IR: ");
-    Serial.println(IR);
-    Serial.print("BPM: ");
-    Serial.println(HR);
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("IR: ");
@@ -661,43 +568,15 @@ void bacasensorStep() {
     lcd.print(" bpm");
     delay(2000);
     selesai_baca = true;
-  } else {
-    Serial.print("IR=");
-    Serial.print(irValue);
-    Serial.print(", BPM=");
-    Serial.print(beatsPerMinute);
-    Serial.print(", Avg BPM=");
-    Serial.print(beatAvg);
-    Serial.print(", Avg IR=");
-    Serial.print(irAvg);
-
-    if (!fingerDetected) Serial.print(" (Tidak ada jari terdeteksi)");
-    Serial.println();
   }
 
   if (selesai_baca) {
-    scaledHR_1 = minMaxScaling(HR, HR_MIN_1, HR_MAX_1);
-    scaledIR_1 = minMaxScaling(IR, IR_MIN_1, IR_MAX_1);
-    scaledUmur_1 = minMaxScaling(umurr, Age_MIN, Age_MAX);
-    scaledHR_2 = minMaxScaling(HR, HR_MIN_2, HR_MAX_2);
-    scaledIR_2 = minMaxScaling(IR, IR_MIN_2, IR_MAX_2);
-    scaledUmur_2 = minMaxScaling(umurr, Age_MIN, Age_MAX);
-    scaledHR_3 = minMaxScaling(HR, HR_MIN_3, HR_MAX_3);
-    scaledIR_3 = minMaxScaling(IR, IR_MIN_3, IR_MAX_3);
-    scaledUmur_3 = minMaxScaling(umurr, Age_MIN, Age_MAX);
-
-    findValue_1 = findValue(scaledHR_1, scaledIR_1, scaledUmur_1, HR_Omega_1, IR_Omega_1, Age_Omega_1, Bias_1);
-    findValue_2 = findValue(scaledHR_2, scaledIR_2, scaledUmur_2, HR_Omega_2, IR_Omega_2, Age_Omega_2, Bias_2);
-    findValue_3 = findValue(scaledHR_3, scaledIR_3, scaledUmur_3, HR_Omega_3, IR_Omega_3, Age_Omega_3, Bias_3);
-
-    sigmoid_1 = sigmoid(findValue_1);
-    sigmoid_2 = sigmoid(findValue_2);
-    sigmoid_3 = sigmoid(findValue_3);
-
-    GLU = RE_minMaxScaling(sigmoid_1, GLU_MIN, GLU_MAX);
-    CHOL = RE_minMaxScaling(sigmoid_2, CHOL_MIN, CHOL_MAX);
-    ACD = REE_minMaxScaling(sigmoid_3, ACD_MIN, ACD_MAX);
-
+    Vector3f inputData;
+    inputData << IR, umurr, HR;
+    GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
+    CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 2));
+    ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 3));
+    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Glu: ");
@@ -717,7 +596,7 @@ void bacasensorStep() {
     delay(3000);
     selesai_baca = false;
     shouldRunBacaSensor = false;
-    melihat();
+    String storedData = readFile2(LittleFS, var2Path);
     returnToMainMenu();
   }
 }
@@ -729,12 +608,10 @@ void saveDataToJson() {
   if (file) {
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
-      Serial.println("Gagal membaca JSON, membuat yang baru.");
       doc["sensor"] = JsonObject();
     }
     file.close();
   } else {
-    Serial.println("File tidak ditemukan, membuat yang baru.");
     doc["sensor"] = JsonObject();
   }
 
@@ -750,13 +627,11 @@ void saveDataToJson() {
 
   file = LittleFS.open(var2Path, FILE_WRITE);
   if (!file) {
-    Serial.println("Gagal membuka file JSON untuk menulis.");
     return;
   }
 
   serializeJson(doc, file);
   file.close();
-  Serial.println("Data berhasil disimpan dalam JSON.");
 }
 
 String getTimestamp() {
@@ -766,11 +641,8 @@ String getTimestamp() {
   bool isPM = false;
 
   snprintf(dateBuffer, sizeof(dateBuffer), "%04u-%02u-%02uT%02u:%02u:%02u+07:00",
-           myRTC.getYear() + 2000,
-           myRTC.getMonth(isCentury),
-           myRTC.getDate(),
-           myRTC.getHour(is12HourFormat, isPM),
-           myRTC.getMinute(),
+           myRTC.getYear() + 2000, myRTC.getMonth(isCentury), myRTC.getDate(),
+           myRTC.getHour(is12HourFormat, isPM), myRTC.getMinute(),
            myRTC.getSecond());
   return String(dateBuffer);
 }
@@ -779,7 +651,6 @@ void initWiFi() {
   ssid = readFile(LittleFS, ssidPath);
   pass = readFile(LittleFS, passPath);
   if (ssid == "") {
-    Serial.println("SSID tidak terdefinisi.");
     return;
   }
   WiFi.mode(WIFI_STA);
@@ -787,23 +658,18 @@ void initWiFi() {
     localIP.fromString(ip.c_str());
     localGateway.fromString(gateway.c_str());
     if (!WiFi.config(localIP, localGateway, subnet)) {
-      Serial.println("Gagal mengkonfigurasi STA");
     }
   }
 
   WiFi.begin(ssid.c_str(), pass.c_str());
-  Serial.println("Menghubungkan ke WiFi...");
   unsigned long currentMillis = millis();
   previousMillis = currentMillis;
   while (WiFi.status() != WL_CONNECTED) {
     currentMillis = millis();
     if (currentMillis - previousMillis >= intervalWifi) {
-      Serial.println("Gagal terhubung.");
       ESP.restart();
     }
   }
-  Serial.println(WiFi.localIP());
-  Serial.println("Berhasil terhubung!");
   syncTimeFromNTP();
   setupFirebase();
   kirimDataKeFirebase();
@@ -817,9 +683,7 @@ void setupFirebase() {
 
   if (Firebase.signUp(&config, &auth, "", "")) {
     Firebase.reconnectWiFi(true);
-    Serial.println("Firebase Signup berhasil");
   } else {
-    Serial.println("Firebase Signup gagal");
   }
 
   config.token_status_callback = tokenStatusCallback;
@@ -829,13 +693,11 @@ void setupFirebase() {
 
 void kirimDataKeFirebase() {
   if (!Firebase.ready()) {
-    Serial.println("Firebase belum siap");
     return;
   }
 
   File file = LittleFS.open(var2Path, FILE_READ);
   if (!file) {
-    Serial.println("Gagal membuka file JSON");
     return;
   }
 
@@ -844,8 +706,6 @@ void kirimDataKeFirebase() {
   file.close();
 
   if (error) {
-    Serial.print("Gagal mem-parse JSON: ");
-    Serial.println(error.c_str());
     return;
   }
 
@@ -868,28 +728,21 @@ void kirimDataKeFirebase() {
     String parentPath = databasePath + "/" + timestamp;
 
     if (Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json)) {
-      Serial.println("Data berhasil disimpan ke " + parentPath);
     } else {
-      Serial.print("Gagal mengirim data, alasan: ");
-      Serial.println(fbdo.errorReason());
       allDataSent = false;
     }
   }
 
   if (allDataSent) {
-    Serial.println("Data berhasil dikirim dan dihapus");
     deleteFile(LittleFS, var2Path);
   }
 }
 
 void startWiFiSetup() {
-  Serial.println("Mengatur AP (Access Point)");
   WiFi.softAP("ESP-WIFI-MANAGER", NULL);
   IPAddress IP = WiFi.softAPIP();
-  Serial.print("Alamat IP AP: ");
-  Serial.println(IP);
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/wifimanager.html", "text/html");
   });
 
@@ -901,31 +754,27 @@ void startWiFiSetup() {
       if (p->isPost()) {
         if (p->name() == PARAM_INPUT_1) {
           ssid = p->value().c_str();
-          Serial.print("SSID diatur ke: ");
-          Serial.println(ssid);
           writeFile(LittleFS, ssidPath, ssid.c_str());
         }
         if (p->name() == PARAM_INPUT_2) {
           pass = p->value().c_str();
-          Serial.print("Kata sandi diatur ke: ");
-          Serial.println(pass);
           writeFile(LittleFS, passPath, pass.c_str());
         }
         if (p->name() == PARAM_INPUT_3) {
           ip = p->value().c_str();
-          Serial.print("Alamat IP diatur ke: ");
-          Serial.println(ip);
           writeFile(LittleFS, ipPath, ip.c_str());
         }
         if (p->name() == PARAM_INPUT_4) {
           gateway = p->value().c_str();
-          Serial.print("Gateway diatur ke: ");
-          Serial.println(gateway);
           writeFile(LittleFS, gatewayPath, gateway.c_str());
         }
       }
     }
-    request->send(200, "text/plain", "Selesai. ESP akan restart, hubungkan ke router Anda dan buka alamat IP: " + ip);
+    request->send(
+        200, "text/plain",
+        "Selesai. ESP akan restart, hubungkan ke router Anda dan buka alamat "
+        "IP: " +
+            ip);
     delay(3000);
     ESP.restart();
   });
@@ -933,13 +782,10 @@ void startWiFiSetup() {
 }
 
 void syncTimeFromNTP() {
-  Serial.println("Menyinkronkan waktu dengan NTP...");
-
   configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
   struct tm timeinfo;
 
   if (!getLocalTime(&timeinfo)) {
-    Serial.println("Gagal mendapatkan waktu dari NTP");
     return;
   }
 
@@ -949,56 +795,118 @@ void syncTimeFromNTP() {
   myRTC.setHour(timeinfo.tm_hour);
   myRTC.setMinute(timeinfo.tm_min);
   myRTC.setSecond(timeinfo.tm_sec);
-
-  Serial.println("Waktu berhasil diperbarui dari NTP");
 }
 
-void melihat() {
-  Serial.println();
-  Serial.println("Nilai Mentah");
-  Serial.print("IR: ");
-  Serial.println(IR);
-  Serial.print("HR: ");
-  Serial.println(HR);
-  Serial.print("Umur: ");
-  Serial.println(umur);
-  Serial.println();
-  Serial.println("Gula Darah");
-  Serial.print("IR Min-Max Scaling: ");
-  Serial.println(scaledHR_1);
-  Serial.print("HR Min-Max Scaling: ");
-  Serial.println(scaledIR_1);
-  Serial.print("Umur Min-Max Scaling: ");
-  Serial.println(scaledUmur_1);
-  Serial.print("Nilai Y Gula Darah: ");
-  Serial.println(sigmoid_1);
-  Serial.print("Prediksi Gula Darah: ");
-  Serial.println(GLU);
-  Serial.println();
-  Serial.println("Asam Urat");
-  Serial.print("IR Min-Max Scaling: ");
-  Serial.println(scaledHR_3);
-  Serial.print("HR Min-Max Scaling: ");
-  Serial.println(scaledIR_3);
-  Serial.print("Umur Min-Max Scaling: ");
-  Serial.println(scaledUmur_3);
-  Serial.print("Nilai Y Asam urat: ");
-  Serial.println(sigmoid_3);
-  Serial.print("Prediksi Asam urat: ");
-  Serial.println(ACD);
-  Serial.println();
-  Serial.println("Kolestrol");
-  Serial.print("IR Min-Max Scaling: ");
-  Serial.println(scaledHR_2);
-  Serial.print("HR Min-Max Scaling: ");
-  Serial.println(scaledIR_2);
-  Serial.print("Umur Min-Max Scaling: ");
-  Serial.println(scaledUmur_2);
-  Serial.print("Nilai Y Kolestrol: ");
-  Serial.println(sigmoid_2);
-  Serial.print("Prediksi Kolestrol: ");
-  Serial.println(CHOL);
-  String storedData = readFile2(LittleFS, var2Path);
-  Serial.println();
-  Serial.println(storedData);
+uint8_t roundUpToUint8(float value) {
+  return static_cast<uint8_t>(ceil(value));
+}
+
+float roundToOneDecimal(float value) {
+  return round(value * 10.0f) / 10.0f;
+}
+
+float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
+  Eigen::Vector3f x = input;
+  Eigen::Vector3f xp1;
+  Eigen::VectorXf a1;
+  float a2;
+  float y1;
+
+  switch (network_id) {
+    case 1: {
+      Eigen::Vector3f x_offset(51735, 9, 26);
+      Eigen::Vector3f gain(3.64896916621055e-05, 0.0294117647058824,
+                           0.0266666666666667);
+      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
+
+      float b1 = -16.63759766878351698f;
+      Eigen::RowVector3f IW1_1(2.1493558295058914354f,
+                               14.726331644390356246f,
+                               16.513591564909340548f);
+      float sum = IW1_1 * xp1 + b1;
+      a1.resize(1);
+      a1[0] = 2.0f / (1.0f + exp(-2.0f * sum)) - 1.0f;
+
+      float b2 = -0.39083029729430657229f;
+      float LW2_1 = 0.24426653523419675218f;
+      a2 = LW2_1 * a1[0] + b2;
+
+      float y_gain = 0.0117647058823529f;
+      float y_xoffset = 94.0f;
+      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      break;
+    }
+    case 2: {
+      Eigen::Vector3f x_offset(58124, 9, 55);
+      Eigen::Vector3f gain(4.34839326868722e-05, 0.0266666666666667,
+                           0.0416666666666667);
+      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
+
+      Eigen::VectorXf b1(5);
+      b1 << -4.1572857480307350286f, -0.38029472457922613993f,
+          0.70156562858405513428f, 1.071440477708899941f,
+          2.1105006102053316397f;
+      Eigen::MatrixXf IW1_1(5, 3);
+      IW1_1 << 2.5350106320688046146f, -3.2503410452606162906f,
+          1.6572979890684240711f, 0.90462799086409484417f,
+          2.4814449873300388205f, -0.0057440872056210220964f,
+          -1.0605734542426203948f, -0.19615437391647000398f,
+          1.9414825351178413015f, 1.7987390581184692362f,
+          -0.77200529967437936385f, -0.99063946624861731749f,
+          0.63577746361881404269f, 2.1635580643615264229f,
+          -1.3125931768397518518f;
+      Eigen::VectorXf layer1 = IW1_1 * xp1 + b1;
+      a1.resize(5);
+      for (int i = 0; i < 5; i++) {
+        a1[i] = 2.0f / (1.0f + exp(-2.0f * layer1[i])) - 1.0f;
+      }
+
+      float b2 = 0.57574514652368069534f;
+      Eigen::RowVectorXf LW2_1(5);
+      LW2_1 << 2.0816195454248540564f, 0.40146089545829760636f,
+          0.24168468981366877935f, -0.0050136968048260094344f,
+          1.0409722567092083434f;
+      a2 = LW2_1 * a1 + b2;
+
+      float y_gain = 0.3125f;
+      float y_xoffset = 2.4f;
+      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      break;
+    }
+    case 3: {
+      Eigen::Vector3f x_offset(52788, 17, 26);
+      Eigen::Vector3f gain(3.98374631503466e-05, 0.0298507462686567,
+                           0.025974025974026);
+      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
+
+      Eigen::VectorXf b1(3);
+      b1 << 2.8987119892188055736f, 9.9275370296609057874f,
+          7.3558450309877070339f;
+      Eigen::MatrixXf IW1_1(3, 3);
+      IW1_1 << 7.8709740143197421958f, 13.886396469436782297f,
+          12.231008407705287411f, -13.894948315389491711f,
+          -33.600792028840380965f, -15.022515547619278209f,
+          0.57951782866092504953f, 5.9329585451750430636f,
+          -5.2409751499447558842f;
+      Eigen::VectorXf layer1 = IW1_1 * xp1 + b1;
+      a1.resize(3);
+      for (int i = 0; i < 3; i++) {
+        a1[i] = 2.0f / (1.0f + exp(-2.0f * layer1[i])) - 1.0f;
+      }
+
+      float b2 = 0.50460391480801192188f;
+      Eigen::RowVectorXf LW2_1(3);
+      LW2_1 << 0.18972498791585371003f, -0.36183087980935402239f,
+          -0.69365338494794059887f;
+      a2 = LW2_1 * a1 + b2;
+
+      float y_gain = 0.0105263157894737f;
+      float y_xoffset = 100.0f;
+      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      break;
+    }
+    default:
+      return -1.0f;
+  }
+  return y1;
 }
