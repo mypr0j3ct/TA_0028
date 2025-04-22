@@ -116,7 +116,7 @@ VectorXf b1;
 MatrixXf IW1_1;
 RowVectorXf LW2_1;
 float a2;
-float y1;
+float y1_output; 
 float b2;
 float y_gain;
 float y_xoffset;
@@ -810,7 +810,7 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
   Eigen::Vector3f xp1;
   Eigen::VectorXf a1;
   float a2;
-  float y1;
+  float y1_output;
 
   switch (network_id) {
     case 1: {
@@ -833,7 +833,7 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
 
       float y_gain = 0.0117647058823529f;
       float y_xoffset = 94.0f;
-      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
       break;
     }
     case 2: {
@@ -870,7 +870,7 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
 
       float y_gain = 0.3125f;
       float y_xoffset = 2.4f;
-      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
       break;
     }
     case 3: {
@@ -902,11 +902,11 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
 
       float y_gain = 0.0105263157894737f;
       float y_xoffset = 100.0f;
-      y1 = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
       break;
     }
     default:
       return -1.0f;
   }
-  return y1;
+  return y1_output;
 }
