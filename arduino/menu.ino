@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <Wire.h>
 #include <time.h>
+#include <cmath>
+#include <cstdint>
 #include <DS3231.h>
 #include <AsyncTCP.h>
 #include <LittleFS.h>
@@ -70,7 +72,7 @@ uint8_t umur = Age_MIN;
 uint8_t inputStage = 0;
 uint8_t idmicroInputStage = 0;
 uint8_t idmicroDigits[3] = {0, 0, 0};
-uint8_t GLU, CHOL;
+uint8_t GLU, CHOL, healthStatus;
 bool inSubMenu = false;
 bool initialized = false;
 bool isSettingAge = false;
@@ -91,6 +93,7 @@ String uridPath = "/urid";
 String heartPath = "/heart";
 String alterPath = "/alter";
 String timePath = "/timestamp";
+String statPath = "/status";
 
 unsigned long startTime;
 unsigned long lastButtonPressTime = 0;
@@ -108,19 +111,6 @@ byte rates[RATE_SIZE];
 byte irValues[RATE_SIZE];
 byte rateSpot = 0;
 
-Vector3f xp1;
-Vector3f x_offset;
-Vector3f gain;
-VectorXf a1;
-VectorXf b1;
-MatrixXf IW1_1;
-RowVectorXf LW2_1;
-float a2;
-float y1_output; 
-float b2;
-float y_gain;
-float y_xoffset;
-
 void startWiFiSetup();
 void initWiFi();
 void initLittleFS();
@@ -136,6 +126,7 @@ void updateAgeDisplay();
 void updateIdmicroDisplay();
 void bacasensorStep();
 String getTimestamp();
+void displayStoredData();
 uint8_t roundUpToUint8(float value);
 bool debounceButton(Button& button);
 float roundToOneDecimal(float value);
@@ -149,10 +140,12 @@ void copyValuu(uint8_t source, uint8_t& destination);
 void copyValue(uint64_t source, uint64_t& destination);
 void copyValuee(int source, int& destination);
 void handleAgeInput(bool button1Pressed, bool button3Pressed);
+uint8_t cekStatusKesehatan(uint8_t GLU, uint8_t CHOL, float ACD);
 void handleIdmicroInput(bool button1Pressed, bool button3Pressed);
 float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id);
 
 void setup() {
+  Serial.begin(115200);
   lcd.init();
   lcd.backlight();
   initLittleFS();
@@ -312,7 +305,7 @@ void handleSubMenu() {
     initWiFi();
   } else if (menu[menuIndex] == "Setting WiFi") {
     lcd.print("Mengatur WiFi...");
-    startWiFiSetup();
+    displayStoredData();
   }
   inSubMenu = true;
 }
@@ -572,11 +565,12 @@ void bacasensorStep() {
 
   if (selesai_baca) {
     Vector3f inputData;
-    inputData << IR, umurr, HR;
+    inputData << static_cast<float>(IR), static_cast<float>(umurr),
+    static_cast<float>(HR);
     GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
-    CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 2));
-    ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 3));
-    
+    CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 3));
+    ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 2));
+    healthStatus = cekStatusKesehatan(GLU, CHOL, ACD);
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Glu: ");
@@ -623,6 +617,7 @@ void saveDataToJson() {
   sensorData["urid"] = ACD;
   sensorData["heart"] = HR;
   sensorData["alter"] = umur;
+  sensorData["stat"] = healthStatus;
   sensorData["timestamp"] = timestamp;
 
   file = LittleFS.open(var2Path, FILE_WRITE);
@@ -632,6 +627,7 @@ void saveDataToJson() {
 
   serializeJson(doc, file);
   file.close();
+  Serial.println("Data berhasil disimpan ke file JSON di LittleFS");
 }
 
 String getTimestamp() {
@@ -722,12 +718,14 @@ void kirimDataKeFirebase() {
     json.set(uridPath.c_str(), data["urid"].as<String>());
     json.set(heartPath.c_str(), data["heart"].as<String>());
     json.set(alterPath.c_str(), data["alter"].as<String>());
+    json.set(statPath.c_str(), data["stat"].as<String>());
     json.set(timePath, timestamp);
 
     String databasePath = "/sensor";
     String parentPath = databasePath + "/" + timestamp;
 
     if (Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json)) {
+      Serial.println("Data JSON berhasil dikirim di firebase");
     } else {
       allDataSent = false;
     }
@@ -735,12 +733,15 @@ void kirimDataKeFirebase() {
 
   if (allDataSent) {
     deleteFile(LittleFS, var2Path);
+    Serial.print("Data JSON telah dihapus dari memori flash");
   }
 }
 
 void startWiFiSetup() {
   WiFi.softAP("ESP-WIFI-MANAGER", NULL);
   IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP); 
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/wifimanager.html", "text/html");
@@ -773,8 +774,7 @@ void startWiFiSetup() {
     request->send(
         200, "text/plain",
         "Selesai. ESP akan restart, hubungkan ke router Anda dan buka alamat "
-        "IP: " +
-            ip);
+        "IP: " + ip);
     delay(3000);
     ESP.restart();
   });
@@ -797,8 +797,32 @@ void syncTimeFromNTP() {
   myRTC.setSecond(timeinfo.tm_sec);
 }
 
+void displayStoredData() {
+  String storedData = readFile2(LittleFS, var2Path);
+  if (storedData == "") {
+    Serial.println("Tidak ada data tersimpan.");
+    delay(1000);
+  } else {
+    Serial.println("Data tersimpan:");
+    Serial.println(storedData);
+    delay(1000);
+  }
+  startWiFiSetup();
+}
+
+uint8_t cekStatusKesehatan(uint8_t GLU, uint8_t CHOL, float ACD) {
+    bool asamUratNormal = (ACD >= 3.5f && ACD <= 7.0f);
+    bool kolesterolNormal = (CHOL < 200);
+    bool gulaDarahNormal = (GLU >= 70 && GLU <= 140);
+
+    return (asamUratNormal && kolesterolNormal && gulaDarahNormal) ? 1 : 0;
+}
+
 uint8_t roundUpToUint8(float value) {
-  return static_cast<uint8_t>(ceil(value));
+  if (value < 0.0f) return 0;
+  float rounded_up = ceil(value);
+  if (rounded_up > 255.0f) return 255;
+  return static_cast<uint8_t>(rounded_up);
 }
 
 float roundToOneDecimal(float value) {
@@ -812,101 +836,145 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
   float a2;
   float y1_output;
 
+  const float input_ymin = 0.0f;
+  const float output_ymin = 0.0f;
+
   switch (network_id) {
     case 1: {
-      Eigen::Vector3f x_offset(51735, 9, 26);
-      Eigen::Vector3f gain(3.64896916621055e-05, 0.0294117647058824,
-                           0.0266666666666667);
-      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
-
-      float b1 = -16.63759766878351698f;
-      Eigen::RowVector3f IW1_1(2.1493558295058914354f,
-                               14.726331644390356246f,
-                               16.513591564909340548f);
-      float sum = IW1_1 * xp1 + b1;
-      a1.resize(1);
-      a1[0] = 2.0f / (1.0f + exp(-2.0f * sum)) - 1.0f;
-
-      float b2 = -0.39083029729430657229f;
-      float LW2_1 = 0.24426653523419675218f;
-      a2 = LW2_1 * a1[0] + b2;
-
-      float y_gain = 0.0117647058823529f;
-      float y_xoffset = 94.0f;
-      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
-      break;
-    }
-    case 2: {
-      Eigen::Vector3f x_offset(58124, 9, 55);
-      Eigen::Vector3f gain(4.34839326868722e-05, 0.0266666666666667,
-                           0.0416666666666667);
-      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
+      Eigen::Vector3f x_offset(56543.0f, 24.0f, 60.0f);
+      Eigen::Vector3f gain(1.99992000319987e-05f, 0.0188679245283019f,
+                           0.024390243902439f);
 
       Eigen::VectorXf b1(5);
-      b1 << -4.1572857480307350286f, -0.38029472457922613993f,
-          0.70156562858405513428f, 1.071440477708899941f,
-          2.1105006102053316397f;
+      b1 << 0.043478314201888204615f, 0.045332591642713096491f,
+          -0.22422832665006922626f, -0.10298572226547086927f,
+          -0.020543463362604305611f;
       Eigen::MatrixXf IW1_1(5, 3);
-      IW1_1 << 2.5350106320688046146f, -3.2503410452606162906f,
-          1.6572979890684240711f, 0.90462799086409484417f,
-          2.4814449873300388205f, -0.0057440872056210220964f,
-          -1.0605734542426203948f, -0.19615437391647000398f,
-          1.9414825351178413015f, 1.7987390581184692362f,
-          -0.77200529967437936385f, -0.99063946624861731749f,
-          0.63577746361881404269f, 2.1635580643615264229f,
-          -1.3125931768397518518f;
-      Eigen::VectorXf layer1 = IW1_1 * xp1 + b1;
-      a1.resize(5);
-      for (int i = 0; i < 5; i++) {
-        a1[i] = 2.0f / (1.0f + exp(-2.0f * layer1[i])) - 1.0f;
-      }
+      IW1_1 << -0.15040868318387079494f, -0.19201539462629302335f,
+          -0.15899545524421829223f, -0.15466743692436682456f,
+          -0.19760650735482382379f, -0.16369386148328080033f,
+          0.21563835158211197562f, 0.32556422845982946335f,
+          0.29314867821981638318f, 0.18160375245888715767f,
+          0.24912212264468475142f, 0.21000944829333154096f,
+          0.11972911628732171851f, 0.14768162356584002559f,
+          0.12178649633391974705f;
 
-      float b2 = 0.57574514652368069534f;
+      float b2 = -0.004746110129271247785f;
       Eigen::RowVectorXf LW2_1(5);
-      LW2_1 << 2.0816195454248540564f, 0.40146089545829760636f,
-          0.24168468981366877935f, -0.0050136968048260094344f,
-          1.0409722567092083434f;
-      a2 = LW2_1 * a1 + b2;
+      LW2_1 << -0.3090060562877842143f, -0.31274375113945251936f,
+          0.5983171408725674878f, 0.43022673601241495644f,
+          0.2376365869375564599f;
 
-      float y_gain = 0.3125f;
-      float y_xoffset = 2.4f;
-      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
-      break;
-    }
-    case 3: {
-      Eigen::Vector3f x_offset(52788, 17, 26);
-      Eigen::Vector3f gain(3.98374631503466e-05, 0.0298507462686567,
-                           0.025974025974026);
-      xp1 = (x - x_offset).array() * gain.array() + (-1.0f);
+      float y_gain = 0.0111111111111111f;
+      float y_xoffset = 95.0f;
 
-      Eigen::VectorXf b1(3);
-      b1 << 2.8987119892188055736f, 9.9275370296609057874f,
-          7.3558450309877070339f;
-      Eigen::MatrixXf IW1_1(3, 3);
-      IW1_1 << 7.8709740143197421958f, 13.886396469436782297f,
-          12.231008407705287411f, -13.894948315389491711f,
-          -33.600792028840380965f, -15.022515547619278209f,
-          0.57951782866092504953f, 5.9329585451750430636f,
-          -5.2409751499447558842f;
-      Eigen::VectorXf layer1 = IW1_1 * xp1 + b1;
-      a1.resize(3);
-      for (int i = 0; i < 3; i++) {
-        a1[i] = 2.0f / (1.0f + exp(-2.0f * layer1[i])) - 1.0f;
+      xp1 = (x - x_offset).array() * gain.array() + input_ymin;
+
+      Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
+      a1.resize(n1.size());
+      for (int i = 0; i < n1.size(); ++i) {
+        a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
       }
 
-      float b2 = 0.50460391480801192188f;
-      Eigen::RowVectorXf LW2_1(3);
-      LW2_1 << 0.18972498791585371003f, -0.36183087980935402239f,
-          -0.69365338494794059887f;
       a2 = LW2_1 * a1 + b2;
 
-      float y_gain = 0.0105263157894737f;
-      float y_xoffset = 100.0f;
-      y1_output = (a2 - (-1.0f)) / y_gain + y_xoffset;
+      y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
+
       break;
     }
+
+    case 2: {
+      Eigen::Vector3f x_offset(58124.0f, 31.0f, 60.0f);
+      Eigen::Vector3f gain(2.01987557566454e-05f, 0.0208333333333333f,
+                           0.0232558139534884f);
+
+      Eigen::VectorXf b1(5);
+      b1 << -0.040023234152423231569f, 0.040023244160910798062f,
+          -0.040023244902930021905f, 0.040023254155707996271f,
+          -0.040023248486739465557f;
+      Eigen::MatrixXf IW1_1(5, 3);
+      IW1_1 << 0.20554751351572525531f, 0.12053672989609462429f,
+          0.21052588565821947486f, -0.20554752218654617768f, 
+          -0.12053673177065263311f, -0.21052588755705048396f, 
+          0.2055475303154167821f, 0.12053673697757459615f,
+          0.21052589717051167773f, -0.20554754097468952434f, 
+          -0.12053674049997620266f, -0.21052590227057590977f, 
+          0.2055475345499658546f, 0.12053673841362209929f,
+          0.2105258992799771689f;
+
+      float b2 = 0.08601257368366782563f;
+      Eigen::RowVectorXf LW2_1(5);
+      LW2_1 << 0.34970358559638287099f, -0.34970360773312308966f,
+          0.34970361041289860227f, -0.34970363124485964734f,
+          0.34970361849628894824f;
+
+      float y_gain = 0.222222222222222f;
+      float y_xoffset = 2.4f;
+
+      xp1 = (x - x_offset).array() * gain.array() + input_ymin;
+
+      Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
+      a1.resize(n1.size());
+      for (int i = 0; i < n1.size(); ++i) {
+        a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
+      }
+
+      a2 = LW2_1 * a1 + b2;
+
+      y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
+
+      break;
+    }
+
+    case 3: {
+      Eigen::Vector3f x_offset(58124.0f, 25.0f, 60.0f);
+      Eigen::Vector3f gain(2.0652196361083e-05f, 0.0185185185185185f,
+                           0.0232558139534884f);
+
+      Eigen::VectorXf b1(5);
+      b1 << 0.054253637728892738223f, 0.054253716535899769446f,
+          -0.054253724693496700737f, 0.054253738543225793478f,
+          -0.054253724411656552296f;
+      Eigen::MatrixXf IW1_1(5, 3);
+      IW1_1 << -0.19201222264032605236f, -0.2161493748276628879f,
+          -0.17137429011668622869f, -0.19201232566285278414f,
+          -0.21614950858101003583f, -0.17137438662408638335f, 
+          0.19201230866404364606f, 0.21614950008515446123f, 
+          0.17137437494174911912f, -0.19201227274336196693f, 
+          -0.21614947995887770493f, -0.17137434957630559573f,
+          0.19201230559940885012f, 0.21614949742931777177f,
+          0.17137437248431902637f;
+
+      float b2 = 0.036625506519114281456f;
+      Eigen::RowVectorXf LW2_1(5);
+      LW2_1 << -0.36182559629564642334f, -0.3618257745877578313f,
+          0.36182579099826850388f, -0.36182581833756233269f,
+          0.36182579016130633764f;
+
+      float y_gain = 0.00892857142857143f;
+      float y_xoffset = 123.0f;
+
+      xp1 = (x - x_offset).array() * gain.array() + input_ymin;
+
+      Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
+      a1.resize(n1.size());
+      for (int i = 0; i < n1.size(); ++i) {
+        a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
+      }
+
+      a2 = LW2_1 * a1 + b2;
+
+      y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
+
+      break;
+    }
+
     default:
+      Serial.print("Error: Invalid network_id provided to "
+                   "myNeuralNetworkFunction: ");
+      Serial.println(network_id);
       return -1.0f;
   }
+
   return y1_output;
 }
