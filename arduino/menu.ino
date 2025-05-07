@@ -94,6 +94,7 @@ String heartPath = "/heart";
 String alterPath = "/alter";
 String timePath = "/timestamp";
 String statPath = "/status";
+String IRPath = "/ifra";
 
 unsigned long startTime;
 unsigned long lastButtonPressTime = 0;
@@ -581,11 +582,23 @@ void bacasensorStep() {
     lcd.print(ACD, 1);
     lcd.print(" mg/dL");
     delay(4000);
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Chol: ");
-    lcd.print(CHOL);
-    lcd.print(" mg/dL");
+    if (healthStatus == 0) {
+       lcd.clear();
+       lcd.setCursor(0, 0);
+       lcd.print("Chol: ");
+       lcd.print(CHOL);
+       lcd.print(" mg/dL");
+       lcd.setCursor(0, 1);
+       lcd.print("Status: Sakit");
+    } else if (healthStatus == 1) {
+       lcd.setCursor(0, 0);
+       lcd.print("Chol: ");
+       lcd.print(CHOL);
+       lcd.print(" mg/dL");
+       lcd.clear();
+       lcd.setCursor(0, 1);
+       lcd.print("Status: Sehat");
+    }
     saveDataToJson();
     delay(3000);
     selesai_baca = false;
@@ -612,6 +625,7 @@ void saveDataToJson() {
   String timestamp = getTimestamp();
   JsonObject sensorData = doc["sensor"].createNestedObject(timestamp);
   sensorData["idmicro"] = idmicro;
+  sensorData["infrared"] = IR;
   sensorData["glucose"] = GLU;
   sensorData["cholestrol"] = CHOL;
   sensorData["urid"] = ACD;
@@ -713,6 +727,7 @@ void kirimDataKeFirebase() {
     JsonObject data = kv.value();
     FirebaseJson json;
     json.set(idPath.c_str(), data["idmicro"].as<String>());
+    json.set(IRPath.c_str(), data["infrared"].as<String>());
     json.set(gluPath.c_str(), data["glucose"].as<String>());
     json.set(cholPath.c_str(), data["cholestrol"].as<String>());
     json.set(uridPath.c_str(), data["urid"].as<String>());
