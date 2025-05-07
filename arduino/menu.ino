@@ -591,11 +591,11 @@ void bacasensorStep() {
        lcd.setCursor(0, 1);
        lcd.print("Status: Sakit");
     } else if (healthStatus == 1) {
+       lcd.clear();
        lcd.setCursor(0, 0);
        lcd.print("Chol: ");
        lcd.print(CHOL);
        lcd.print(" mg/dL");
-       lcd.clear();
        lcd.setCursor(0, 1);
        lcd.print("Status: Sehat");
     }
