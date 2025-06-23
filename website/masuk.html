@@ -1,131 +1,313 @@
 <!DOCTYPE html>
 <html lang="id">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Masuk</title>
-        <script type="module" src="./config-sdk.js"></script>
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }
-    
-            body {
-                background-color: #f5f7fa;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-            }
-    
-            .login-container, .signup-container {
-                background-color: #fff;
-                padding: 30px;
-                border-radius: 10px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                text-align: center;
-                width: 100%;
-                max-width: 400px;
-            }
-    
-            h2 {
-                margin-bottom: 20px;
-                color: #2c3e50;
-            }
-    
-            input {
-                width: 100%;
-                padding: 10px;
-                margin: 10px 0;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                font-size: 16px;
-            }
-    
-            input:focus {
-                outline: none;
-                border-color: #3498db;
-                box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
-            }
-    
-            button {
-                width: 100%;
-                padding: 10px;
-                background-color: #3498db;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-                transition: background-color 0.3s;
-            }
-    
-            button:hover {
-                background-color: #2980b9;
-            }
-    
-            p {
-                margin-top: 15px;
-            }
-    
-            a {
-                color: #3498db;
-                text-decoration: none;
-            }
-    
-            a:hover {
-                text-decoration: underline;
-            }
-        </style>
-    </head>    
-<body>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Masuk - Healytics</title>
+    <meta name="author" content="J.S Peter Parasian Christian" />
+    <meta
+      name="description"
+      content="Halaman untuk melakukan proses login akun."
+    />
+    <script type="module" src="./config-sdk.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    <div class="login-container">
+        html {
+            background: #a8caff;
+            background-image: url(https://subtlepatterns2015.subtlepatterns.netdna-cdn.com/patterns/dark_embroidery.png);
+            font-family: 'Helvetica Neue', Arial, Sans-Serif;
+            min-height: 100vh;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            font-family: 'Helvetica Neue', Arial, Sans-Serif;
+            margin: 0;
+        }
+
+        .login-wrap {
+            position: relative;
+            background: #ffffff;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 10px;
+            box-shadow: 3px 3px 10px #333;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h2 {
+            text-align: center;
+            font-weight: 200;
+            font-size: 1.8em;
+            margin-top: 10px;
+            color: #5a8dee;
+            margin-bottom: 20px;
+        }
+
+        .form {
+            padding-top: 20px;
+            text-align: left;
+        }
+
+        input[type="email"],
+        input[type="password"]:not(.password-wrapper input),
+        button[type="submit"] {
+            width: 100%;
+            margin-bottom: 20px;
+            height: 45px;
+            border-radius: 5px;
+            outline: none;
+            border: 1px solid #bbb;
+            padding: 0 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border 0.3s ease;
+        }
+
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            border-color: #5a8dee;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
+
+        .password-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .password-wrapper input {
+            width: 100%;
+            height: 45px;
+            border-radius: 5px;
+            outline: none;
+            border: 1px solid #bbb;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border 0.3s ease;
+            margin-bottom: 0;
+            padding: 0 45px 0 10px;
+        }
+
+        .password-wrapper input:focus {
+            border-color: #5a8dee;
+        }
+
+        .password-wrapper span {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 18px;
+            color: #888;
+            z-index: 2;
+        }
+
+        a {
+            font-size: 14px;
+            color: #5a8dee;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+
+        button[type="submit"] {
+            background: #5a8dee;
+            border: none;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: box-shadow .4s ease, background-color 0.3s ease;
+            width: 100%;
+            height: 45px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        button[type="submit"]:hover {
+            box-shadow: 1px 1px 5px #555;
+            background-color: #3867d6;
+        }
+
+        button[type="submit"]:active {
+            box-shadow: 1px 1px 7px #222;
+        }
+
+        .login-wrap:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: -webkit-linear-gradient(left, #27ae60, #3498db, #e74c3c, #f1c40f);
+            height: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+
+        p.login-link-container {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        p.login-link-container a {
+            display: inline;
+            margin-left: 5px;
+            font-size: inherit;
+        }
+
+        @media (max-width: 768px) {
+            .login-wrap {
+                width: 90%;
+                padding: 15px;
+            }
+
+            h2 {
+                font-size: 1.5em;
+            }
+
+            input[type="email"],
+            input[type="password"]:not(.password-wrapper input),
+            button[type="submit"] {
+                font-size: 14px;
+                padding: 0 12px;
+            }
+
+            .password-wrapper input {
+                font-size: 14px;
+                padding: 0 45px 0 12px;
+            }
+
+            button[type="submit"] {
+                font-size: 16px;
+            }
+
+            p.login-link-container {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-wrap {
+                width: 85%;
+                padding: 15px;
+            }
+
+            h2 {
+                font-size: 1.4em;
+            }
+
+            input[type="email"],
+            input[type="password"]:not(.password-wrapper input),
+            button[type="submit"] {
+                font-size: 14px;
+                padding: 0 10px;
+            }
+
+            .password-wrapper input {
+                font-size: 14px;
+                padding: 0 45px 0 10px;
+            }
+
+            button[type="submit"] {
+                font-size: 16px;
+            }
+
+            p.login-link-container {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrap">
         <h2>Login</h2>
-        <form id="loginForm">
-            <input type="email" id="email" placeholder="Email" required><br>
-            <input type="password" id="password" placeholder="Password" required><br>
-            <button type="submit">Masuk</button>
+        <form id="loginForm" class="form">
+            <input type="email" id="email" placeholder="Email" required />
+            <div class="password-wrapper">
+                <input type="password" id="password" placeholder="Password" required>
+                <span id="togglePassword">👁️</span>
+            </div>
+            <button type="submit"> Masuk </button>
         </form>
-        <p>Belum punya akun? <a href="daftar.html">Daftar</a></p>
+        <p class="login-link-container">Belum punya akun?<a href="register.html">Daftar</a></p>
     </div>
 
     <script type="module">
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
-        import { app } from "./config-sdk.js";
-    
-        const db = getDatabase(app);
-        const loginForm = document.getElementById('loginForm');
-    
-        // Cek apakah pengguna sudah login sebelumnya
-        if (localStorage.getItem('isLoggedIn') === 'true') {
-            window.location.href = 'index.html';
+        let app;
+        let db;        
+        try {
+            const configModule = await import('./config-sdk.js');
+            app = configModule.app;
+            console.log('Firebase app loaded successfully');
+            db = getDatabase(app);
+            console.log('Firebase database initialized successfully');
+        } catch (error) {
+            console.error('Error loading Firebase configuration:', error);
+            alert('Terjadi kesalahan saat memuat konfigurasi Firebase. Silakan refresh halaman.');
         }
-    
+
+        const loginForm = document.getElementById('loginForm');
+
+        // Check if user is already logged in
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            if (localStorage.getItem('username') === 'Super Admin') {
+                location.replace('admin.html');
+            } else {
+                location.replace('index.html');
+            }
+        }
+
+        // Handle form submission
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-    
+            
+            if (!db) {
+                alert('Database tidak tersedia. Silakan refresh halaman.');
+                return;
+            }
+
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-    
             const emailKey = email.replace(/[.#$[\]]/g, '_');
             const userRef = ref(db, `users/${emailKey}`);
-    
+
             onValue(userRef, (snapshot) => {
                 if (snapshot.exists()) {
                     const userData = snapshot.val();
                     if (userData.password === password) {
-                        alert('Login berhasil!');
                         localStorage.setItem('isLoggedIn', 'true');
                         localStorage.setItem('username', userData.username);
-                        localStorage.setItem('idmicro', userData.idmicro);
-    
-                        // Mencegah pengguna kembali ke halaman login
-                        history.pushState(null, null, window.location.href);
-                        window.location.href = 'index.html';
+                        if(userData.idmicro) {
+                             localStorage.setItem('idmicro', userData.idmicro);
+                        } else {
+                             localStorage.removeItem('idmicro');
+                        }
+
+                        if (userData.username === "Super Admin") {
+                            location.replace('admin.html');
+                        } else {
+                            location.replace('index.html');
+                        }
                     } else {
                         alert('Password salah.');
                     }
@@ -136,12 +318,15 @@
                 onlyOnce: true
             });
         });
-    
-        // Cegah kembali ke halaman masuk dengan tombol "Back"
-        window.addEventListener('popstate', function () {
-            history.pushState(null, null, window.location.href);
+
+        // Toggle password visibility
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        togglePassword.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            togglePassword.textContent = isPassword ? '🔒' : '👁️';
         });
-    </script>    
-    
+    </script>
 </body>
 </html>
