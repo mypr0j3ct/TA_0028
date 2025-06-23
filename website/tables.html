@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riwayat - Healytics</title>
+  <meta name="author" content="J.S Peter Parasian Christian">
+  <meta name="description"
+    content="Tabel Riwayat Pemeriksaan Medis dengan Filter dan Sorting data pasien Healytics.">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    @import url('https://fonts.googleapis.com/css?family=Karla:400,700&display=swap');
+
+    .font-family-karla {
+      font-family: karla, sans-serif;
+    }
+
+    .bg-sidebar {
+      background: #3d68ff;
+    }
+
+    .cta-btn {
+      color: #3d68ff;
+    }
+
+    .upgrade-btn {
+      background: #1947ee;
+    }
+
+    .upgrade-btn:hover {
+      background: #0038fd;
+    }
+
+    .active-nav-link {
+      background: #1947ee;
+    }
+
+    .nav-item:hover {
+      background: #1947ee;
+    }
+
+    .account-link:hover {
+      background: #3d68ff;
+      color: white;
+    }
+
+    .time-filter-btn.active {
+      z-index: 10;
+      background-color: #3b82f6; 
+      color: white;
+      border-color: #3b82f6; 
+    }
+
+    .time-filter-btn.active:hover {
+      background-color: #2563eb; 
+    }
+
+    .sortable-header .sort-icon {
+      opacity: 0.6;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .sortable-header:hover .sort-icon {
+      opacity: 1;
+    }
+
+    .sortable-header .sort-icon .fa-sort-up,
+    .sortable-header .sort-icon .fa-sort-down {
+      color: white; 
+      opacity: 1;
+    }
+    
+    .sortable-header .sort-icon .fa-sort {
+      color: #9ca3af; 
+    }
+
+
+    #medicalHistoryBody td {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 font-family-karla flex">
+  <aside class="relative bg-sidebar h-screen w-64 hidden sm:block shadow-xl">
+    <div class="p-6">
+      <a href="index.html" class="text-white text-3xl font-semibold uppercase hover:text-gray-300">Healytics</a>
+    </div>
+    <nav class="text-white text-base font-semibold pt-3">
+      <a href="index.html" class="flex items-center text-white opacity-75 hover:opacity-100 py-4 pl-6 nav-item">
+        <i class="fas fa-tachometer-alt mr-3"></i>
+        Dasbor
+      </a>
+      <a href="tables.html" class="flex items-center active-nav-link text-white py-4 pl-6 nav-item">
+        <i class="fas fa-table mr-3"></i>
+        Tabel
+      </a>
+    </nav>
+  </aside>
+
+  <div class="relative w-full flex flex-col h-screen overflow-y-hidden">
+    <header class="w-full items-center bg-white py-2 px-6 hidden sm:flex">
+      <div class="w-1/2"></div>
+      <div x-data="{ isOpen: false }" class="relative w-1/2 flex justify-end">
+        <button id="usernameButton" @click="isOpen = !isOpen"
+          class="realtive z-10 text-gray-800 font-semibold text-lg py-2 px-4 rounded hover:bg-gray-200 focus:outline-none">
+          <span id="usernameDisplay">Nama Pengguna</span> <i class="fas fa-caret-down ml-1"></i>
+        </button>
+        <button x-show="isOpen" @click="isOpen = false" class="h-full w-full fixed inset-0 cursor-default"></button>
+        <div x-show="isOpen" class="absolute w-32 bg-white rounded-lg shadow-lg py-2 mt-12 z-20">
+          <a href="#" id="logoutButton" class="block px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded">Keluar</a>
+        </div>
+      </div>
+    </header>
+
+    <header x-data="{ isOpen: false }" class="w-full bg-sidebar py-5 px-6 sm:hidden">
+      <div class="flex items-center justify-between">
+        <a href="index.html" class="text-white text-3xl font-semibold uppercase hover:text-gray-300">Healytics</a>
+        <button @click="isOpen = !isOpen" class="text-white text-3xl focus:outline-none">
+          <i x-show="!isOpen" class="fas fa-bars"></i>
+          <i x-show="isOpen" class="fas fa-times"></i>
+        </button>
+      </div>
+      <nav :class="isOpen ? 'flex': 'hidden'" class="flex flex-col pt-4 text-white text-base font-semibold">
+        <a href="index.html" class="flex items-center opacity-75 hover:opacity-100 py-2 pl-4 nav-item">
+          <i class="fas fa-tachometer-alt mr-3"></i>
+          Dasbor
+        </a>
+        <a href="tables.html" class="flex items-center active-nav-link py-2 pl-4 nav-item">
+          <i class="fas fa-table mr-3"></i>
+          Tabel
+        </a>
+        <a href="#" id="logoutButtonMobile" class="flex items-center opacity-75 hover:opacity-100 py-2 pl-4 nav-item">
+          <i class="fas fa-sign-out-alt mr-3"></i>
+          Keluar
+        </a>
+      </nav>
+    </header>
+
+    <div class="w-full h-screen overflow-x-hidden border-t flex flex-col">
+      <main class="w-full flex-grow p-6">
+        <h1 class="text-3xl text-black pb-6 font-semibold">Riwayat Pemeriksaan</h1>
+
+        <div class="mb-4 p-4 bg-white rounded-lg shadow-md flex flex-wrap items-center gap-y-2 gap-x-3">
+          <span class="text-base font-medium text-gray-700 mr-2 whitespace-nowrap shrink-0">
+            <i class="far fa-calendar-alt mr-1 text-gray-500"></i> Rentang Waktu:
+          </span>
+          <div id="timeFilterGroup" class="inline-flex rounded-md shadow-sm flex-wrap" role="group">
+            <button type="button" data-value="alltime"
+              class="time-filter-btn px-4 py-2 text-base font-medium text-gray-900 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:text-blue-700 transition duration-150 ease-in-out">
+              Semua
+            </button>
+            <button type="button" data-value="today"
+              class="time-filter-btn px-4 py-2 text-base font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:text-blue-700 transition duration-150 ease-in-out">
+              Hari Ini
+            </button>
+            <button type="button" data-value="3weeks"
+              class="time-filter-btn px-4 py-2 text-base font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:text-blue-700 transition duration-150 ease-in-out">
+              3 Minggu
+            </button>
+            <button type="button" data-value="6months"
+              class="time-filter-btn px-4 py-2 text-base font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:text-blue-700 transition duration-150 ease-in-out">
+              6 Bulan
+            </button>
+            <button type="button" data-value="1year"
+              class="time-filter-btn px-4 py-2 text-base font-medium text-gray-900 bg-white border border-gray-200 rounded-r-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:text-blue-700 transition duration-150 ease-in-out">
+              1 Tahun
+            </button>
+          </div>
+        </div>
+
+        <div class="w-full">
+          <div class="bg-white overflow-auto shadow-lg rounded-lg">
+            <table class="min-w-full text-left border-collapse">
+              <thead class="bg-gray-800 text-white uppercase text-base leading-normal">
+                <tr>
+                  <th scope="col" class="py-3 px-4 font-semibold border-b border-gray-600">No</th>
+                  <th scope="col" class="py-3 px-4 font-semibold border-b border-gray-600">Usia</th>
+                  <th scope="col" class="py-3 px-4 font-semibold border-b border-gray-600">Detak Jantung (bpm)</th>
+                  <th scope="col"
+                    class="sortable-header py-3 px-4 font-semibold border-b border-gray-600 cursor-pointer hover:bg-gray-700 transition duration-150 ease-in-out"
+                    data-column="glucose">
+                    Gula Darah (mg/dL)<span class="sort-icon ml-1 inline-block"><i class="fas fa-sort"></i></span>
+                  </th>
+                  <th scope="col"
+                    class="sortable-header py-3 px-4 font-semibold border-b border-gray-600 cursor-pointer hover:bg-gray-700 transition duration-150 ease-in-out"
+                    data-column="urid">
+                    Asam Urat (mg/dL)<span class="sort-icon ml-1 inline-block"><i class="fas fa-sort"></i></span>
+                  </th>
+                  <th scope="col"
+                    class="sortable-header py-3 px-4 font-semibold border-b border-gray-600 cursor-pointer hover:bg-gray-700 transition duration-150 ease-in-out"
+                    data-column="cholestrol">
+                    Kolesterol (mg/dL)<span class="sort-icon ml-1 inline-block"><i class="fas fa-sort"></i></span>
+                  </th>
+                  <th scope="col" class="py-3 px-4 font-semibold border-b border-gray-600">Status</th>
+                  <th scope="col"
+                    class="sortable-header py-3 px-4 font-semibold border-b border-gray-600 cursor-pointer hover:bg-gray-700 transition duration-150 ease-in-out"
+                    data-column="timestamp">
+                    Tgl Pemeriksaan<span class="sort-icon ml-1 inline-block"><i class="fas fa-sort"></i></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="medicalHistoryBody" class="text-gray-700 text-base">
+                <tr class="border-b border-gray-200">
+                  <td colspan="8" class="text-center py-4 px-6 text-gray-500">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <footer class="w-full bg-white text-right p-4 text-sm text-gray-600">
+        Dibuat oleh <a target="_blank" href="https://shorturl.at/ECTqX"
+          class="underline text-blue-600 hover:text-blue-800">2121600028_J S Peter Parasian Christian</a>.
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+  <script type="module" src="./config-sdk.js"></script>
+
+  <script type="module">
+    import {
+      getDatabase,
+      ref,
+      query,
+      orderByChild,
+      equalTo,
+      onValue,
+    } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js"; 
+    
+    import { app } from "./config-sdk.js"; 
+
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    const storedUsername = localStorage.getItem("username");
+    const storedIdMicro = localStorage.getItem("idmicro");
+
+    if (isLoggedIn !== "true" || !storedUsername || !storedIdMicro) {
+      window.location.replace("login.html");
+    } else {
+      document.getElementById("usernameDisplay").textContent = storedUsername;
+    }
+
+    function logout() {
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("username");
+      localStorage.removeItem("idmicro");
+      window.location.replace("login.html");
+    }
+    document.getElementById("logoutButton").addEventListener("click", logout);
+    document.getElementById("logoutButtonMobile").addEventListener("click", logout);
+
+    const db = getDatabase(app);
+    const sensorRef = ref(db, "sensor"); 
+    const tableBody = document.getElementById("medicalHistoryBody");
+    const timeFilterGroup = document.getElementById("timeFilterGroup");
+    const tableHeaders = document.querySelectorAll(".sortable-header");
+
+    let allFirebaseData = []; 
+    let currentSort = { column: "timestamp", direction: "desc" }; 
+    let currentTimeFilter = "alltime"; 
+
+    function cleanTimestamp(timestamp) {
+      if (typeof timestamp !== "string") return null;
+      return timestamp.replace(/([+-]\d{2}):(\d)$/, "$1:0$2");
+    }
+
+    function formatTableDateTime(timestamp) {
+      const cleanedTimestamp = cleanTimestamp(timestamp);
+      if (!cleanedTimestamp) return "Invalid Timestamp"; 
+      const date = new Date(cleanedTimestamp);
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date encountered for table display:", timestamp);
+        return timestamp; 
+      }
+      return date.toLocaleString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta"
+      });
+    }
+
+    timeFilterGroup.addEventListener("click", (e) => {
+      const button = e.target.closest(".time-filter-btn");
+      if (button && button.dataset.value !== currentTimeFilter) {
+        currentTimeFilter = button.dataset.value;
+        timeFilterGroup
+          .querySelectorAll(".time-filter-btn")
+          .forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+        applyFiltersAndSort(); 
+      }
+    });
+
+    tableHeaders.forEach((header) => {
+      header.addEventListener("click", () => {
+        const column = header.dataset.column;
+        let direction = "asc";
+        if (currentSort.column === column) {
+          direction = currentSort.direction === "asc" ? "desc" : "asc";
+        }
+        currentSort = { column, direction };
+        updateSortIcons(); 
+        applyFiltersAndSort(); 
+      });
+    });
+
+    function updateSortIcons() {
+      tableHeaders.forEach((header) => {
+        const iconContainer = header.querySelector(".sort-icon i");
+        const column = header.dataset.column;
+        if (column === currentSort.column) {
+          iconContainer.className = `fas fa-sort-${
+            currentSort.direction === "asc" ? "up" : "down"
+          }`;
+        } else {
+          iconContainer.className = "fas fa-sort"; 
+        }
+      });
+    }
+
+    function applyFiltersAndSort() {
+      console.log(
+        "Menerapkan filter:",
+        currentTimeFilter,
+        "dan sort:",
+        currentSort
+      );
+      let filteredData = filterDataByTime(allFirebaseData, currentTimeFilter);
+
+      filteredData.sort((a, b) => {
+        let valA = a[currentSort.column];
+        let valB = b[currentSort.column];
+
+        if (currentSort.column === "timestamp") {
+          valA = new Date(cleanTimestamp(valA) || 0); 
+          valB = new Date(cleanTimestamp(valB) || 0);
+        } else if (
+          ["glucose", "urid", "cholestrol", "alter", "heart"].includes(
+            currentSort.column
+          )
+        ) {
+          valA = parseFloat(valA) || 0; 
+          valB = parseFloat(valB) || 0;
+        }
+        
+        if (valA < valB) {
+          return currentSort.direction === "asc" ? -1 : 1;
+        }
+        if (valA > valB) {
+          return currentSort.direction === "asc" ? 1 : -1;
+        }
+        return 0; 
+      });
+
+      renderTable(filteredData); 
+    }
+
+    function filterDataByTime(data, filterType) {
+      if (filterType === "alltime") return [...data]; 
+
+      const now = new Date();
+      let startDate;
+
+      switch (filterType) {
+        case "today":
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case "3weeks":
+          startDate = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000); 
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case "6months":
+          startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case "1year":
+          startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        default:
+          return [...data]; 
+      }
+
+      console.log(`Filter Waktu Aktif: ${filterType}, Mulai dari: ${startDate.toISOString()}`);
+
+      return data.filter((item) => {
+        const itemDate = new Date(cleanTimestamp(item.timestamp));
+        return !isNaN(itemDate.getTime()) && itemDate >= startDate;
+      });
+    }
+
+    function renderTable(data) {
+      tableBody.innerHTML = ""; 
+
+      if (!data || data.length === 0) {
+        tableBody.innerHTML = `<tr class="border-b border-gray-200"><td colspan="8" class="text-center py-4 px-6 text-gray-500">Tidak ada data riwayat pemeriksaan${
+          currentTimeFilter !== "alltime"
+            ? " yang cocok dengan filter waktu yang dipilih"
+            : ""
+        }.</td></tr>`;
+        return;
+      }
+
+      data.forEach((item, index) => {
+        const formattedDateTime = formatTableDateTime(item.timestamp);
+        const uridValue = parseFloat(item.urid); 
+        
+        let statusText = "-"; 
+        if (item.status === "1") {
+          statusText = "Sehat";
+        } else if (item.status === "0") {
+          statusText = "Tidak Sehat";
+        } else if (item.status !== undefined && item.status !== null) {
+          statusText = `Status: ${item.status}`; 
+        }
+
+        const row = `
+          <tr class="border-b border-gray-200 hover:bg-gray-100 transition duration-150 ease-in-out">
+              <td class="py-3 px-4">${index + 1}</td>
+              <td class="py-3 px-4">${item.alter || "-"}</td>
+              <td class="py-3 px-4">${item.heart || "-"}</td>
+              <td class="py-3 px-4">${item.glucose || "-"}</td>
+              <td class="py-3 px-4">${
+                !isNaN(uridValue) ? uridValue.toFixed(1) : "-"
+              }</td>
+              <td class="py-3 px-4">${item.cholestrol || "-"}</td>
+              <td class="py-3 px-4">${statusText}</td>
+              <td class="py-3 px-4 whitespace-nowrap">${formattedDateTime}</td>
+          </tr>
+        `;
+        tableBody.insertAdjacentHTML("beforeend", row);
+      });
+    }
+
+    if (storedIdMicro) {
+        const userSensorQuery = query(
+            sensorRef,
+            orderByChild("idmicro"), 
+            equalTo(storedIdMicro)    
+        );
+
+        onValue(
+            userSensorQuery,
+            (snapshot) => {
+                tableBody.innerHTML = `<tr class="border-b border-gray-200"><td colspan="8" class="text-center py-4 px-6 text-gray-500">Memproses data...</td></tr>`;
+
+                if (snapshot.exists()) {
+                    const sensorData = snapshot.val();
+                    allFirebaseData = Object.entries(sensorData).map(([key, value]) => ({
+                        ...value, 
+                        timestamp: value.timestamp || key 
+                    }));
+                    
+                    console.log(
+                        `Data Firebase diterima untuk idmicro ${storedIdMicro}:`,
+                        allFirebaseData.length,
+                        "entri"
+                    );
+
+                    const initialActiveButton = timeFilterGroup.querySelector(
+                        `.time-filter-btn[data-value="${currentTimeFilter}"]`
+                    );
+                    if (initialActiveButton && !initialActiveButton.classList.contains('active')) {
+                        timeFilterGroup.querySelectorAll(".time-filter-btn").forEach(btn => btn.classList.remove("active"));
+                        initialActiveButton.classList.add("active");
+                    }
+                    
+                    updateSortIcons(); 
+                    applyFiltersAndSort(); 
+                } else {
+                    console.log(
+                        `Tidak ada data sensor ditemukan untuk idmicro ${storedIdMicro}.`
+                    );
+                    allFirebaseData = []; 
+                    renderTable(allFirebaseData); 
+                }
+            },
+            (error) => {
+                console.error("Error mengambil data Firebase:", error);
+                tableBody.innerHTML = `<tr class="border-b border-gray-200"><td colspan="8" class="text-center py-4 px-6 text-red-500">Gagal mengambil data riwayat. Silakan coba lagi nanti. Kode error: ${error.code}</td></tr>`;
+            }
+        );
+    } else {
+        console.error("Tidak ada idmicro yang tersimpan. Tidak dapat mengambil data.");
+        tableBody.innerHTML = `<tr class="border-b border-gray-200"><td colspan="8" class="text-center py-4 px-6 text-red-500">Error: ID pengguna tidak ditemukan.</td></tr>`;
+    }
+  </script>
+</body>
+</html>
