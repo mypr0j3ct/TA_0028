@@ -1,25 +1,25 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-import { getDatabase, ref, set, onValue} from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "[MASUKKAN_API_KEY_ANDA_DI_SINI]",
-  authDomain: "[MASUKKAN_AUTH_DOMAIN_ANDA_DI_SINI]",
-  databaseURL: "[MASUKKAN_DATABASE_URL_ANDA_DI_SINI]",
-  projectId: "[MASUKKAN_PROJECT_ID_ANDA_DI_SINI]",
-  storageBucket: "[MASUKKAN_STORAGE_BUCKET_ANDA_DI_SINI]",
-  messagingSenderId: "[MASUKKAN_MESSAGING_SENDER_ID_ANDA_DI_SINI]",
-  appId: "[MASUKKAN_APP_ID_ANDA_DI_SINI]",
-  measurementId: "[MASUKKAN_MEASUREMENT_ID_ANDA_DI_SINI]"
+  apiKey: "AIzaSyDX9FQQai2rWeUubCX903z-yPMro_TGTIQ",
+  authDomain: "projectv1-a9190.firebaseapp.com",
+  databaseURL: "https://projectv1-a9190-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "projectv1-a9190",
+  storageBucket: "projectv1-a9190.firebasestorage.app",
+  messagingSenderId: "343955967254",
+  appId: "1:343955967254:web:6de9646cb6140a07a89437",
+  measurementId: "G-N903P4FH5W"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
-export {app}
+let analytics;
+try {
+  analytics = getAnalytics(app);
+  console.log('Firebase Analytics initialized successfully');
+} catch (error) {
+  console.warn('Analytics could not be initialized:', error.message);
+}
+
+export { app, analytics };
