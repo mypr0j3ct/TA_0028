@@ -1,21 +1,156 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <Wire.h>
-#include <time.h>
 #include <cmath>
 #include <cstdint>
-#include <DS3231.h>
-#include <AsyncTCP.h>
-#include <LittleFS.h>
-#include <ArduinoJson.h>
-#include <ESPAsyncWebServer.h>
-#include <Firebase_ESP_Client.h>
 #include <ArduinoEigen.h>
+
+#include <Wire.h>
+#include <DS3231.h>
+#include <MAX30105.h>
 #include <LiquidCrystal_I2C.h>
 #include "heartRate.h"
-#include "MAX30105.h"
+
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+
+#include <LittleFS.h>
+#include <ArduinoJson.h>
+
+#include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP Wi-Fi Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <style>
+    html {
+      font-family: Arial, Helvetica, sans-serif; 
+      display: inline-block; 
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.8rem; 
+      color: white;
+    }
+    p { 
+      font-size: 1.4rem;
+    }
+    .topnav { 
+      overflow: hidden; 
+      background-color: #0A1128;
+    }
+    body {  
+      margin: 0;
+    }
+    .content { 
+      padding: 5%;
+    }
+    .card-grid { 
+      max-width: 800px; 
+      margin: 0 auto; 
+      display: grid; 
+      grid-gap: 2rem; 
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    .card { 
+      background-color: white; 
+      box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+    }
+    .card-title { 
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #034078;
+    }
+    input[type=submit] {
+      border: none;
+      color: #FEFCFB;
+      background-color: #034078;
+      padding: 15px 15px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      width: 100px;
+      margin-right: 10px;
+      border-radius: 4px;
+      transition-duration: 0.4s;
+    }
+    input[type=submit]:hover {
+      background-color: #1282A2;
+    }
+    input[type=text], input[type=number], select {
+      width: 50%;
+      padding: 12px 20px;
+      margin: 18px;
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    label {
+      font-size: 1.2rem; 
+    }
+    .value {
+      font-size: 1.2rem;
+      color: #1282A2;  
+    }
+    .state {
+      font-size: 1.2rem;
+      color: #1282A2;
+    }
+    button {
+      border: none;
+      color: #FEFCFB;
+      padding: 15px 32px;
+      text-align: center;
+      font-size: 16px;
+      width: 100px;
+      border-radius: 4px;
+      transition-duration: 0.4s;
+    }
+    .button-on {
+      background-color: #034078;
+    }
+    .button-on:hover {
+      background-color: #1282A2;
+    }
+    .button-off {
+      background-color: #858585;
+    }
+    .button-off:hover {
+      background-color: #252524;
+    }
+  </style>
+</head>
+<body>
+  <div class="topnav">
+    <h1>ESP Wi-Fi Manager</h1>
+  </div>
+  <div class="content">
+    <div class="card-grid">
+      <div class="card">
+        <form action="/" method="POST">
+            <p>
+              <label for="ssid">SSID</label>
+              <input type="text" id="ssid" name="ssid"><br>
+              <label for="pass">Password</label>
+              <input type="text" id="pass" name="pass"><br>
+              <input type="hidden" id="ip" name="ip" value="192.168.1.200">
+              <input type="hidden" id="gateway" name="gateway" value="192.168.1.1">
+              <input type="submit" value="Submit">
+            </p>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+)rawliteral";
 
 #define API_KEY "AIzaSyDX9FQQai2rWeUubCX903z-yPMro_TGTIQ"
 #define DATABASE_URL "https://projectv1-a9190-default-rtdb.asia-southeast1.firebasedatabase.app/"
@@ -48,7 +183,7 @@ const char* passPath = "/pass.txt";
 const char* ipPath = "/ip.txt";
 const char* gatewayPath = "/gateway.txt";
 const char* var2Path = "/data/value.txt";
-const String menu[] = {"Mulai Ukur", "Upload Data", "Setting WiFi"};
+const String menu[] = {"Mulai Ukur", "Setting WiFi", "Upload Data"};
 const int menuSize = sizeof(menu) / sizeof(menu[0]);
 
 DS3231 myRTC;
@@ -108,9 +243,10 @@ int HR = 0;
 uint64_t IR = 0;
 int avgir, avgbpm;
 float ACD;
-byte rates[RATE_SIZE];
-byte irValues[RATE_SIZE];
-byte rateSpot = 0;
+uint64_t irSum = 0;
+uint32_t irCount = 0;
+long beatSum = 0;
+int beatCount = 0;
 
 void startWiFiSetup();
 void initWiFi();
@@ -169,17 +305,14 @@ void setup() {
 void loop() {
   bool button1Pressed = debounceButton(button1);
   bool button3Pressed = debounceButton(button3);
-
   if (!inSubMenu && button1Pressed) {
     handleMainMenu();
   }
-
   if (isSettingAge) {
     handleAgeInput(button1Pressed, button3Pressed);
   } else if (isSettingIdmicro) {
     handleIdmicroInput(button1Pressed, button3Pressed);
   }
-
   if (button3Pressed) {
     if (!inSubMenu && cursorRow == 1) {
       handleSubMenu();
@@ -188,7 +321,6 @@ void loop() {
       returnToMainMenu();
     }
   }
-
   if (shouldRunBacaSensor) {
     bacasensorStep();
   }
@@ -276,12 +408,15 @@ void returnToMainMenu() {
   shouldRunBacaSensor = false;
   selesai_baca = false;
   showMainMenu();
-  rateSpot = 0;
   lastBeat = 0;
   fingerDetected = false;
   beatsPerMinute = 0;
   beatAvg = 0;
   irAvg = 0;
+  irSum = 0;
+  irCount = 0;
+  beatSum = 0;
+  beatCount = 0;
   WiFi.softAPdisconnect(true);
 }
 
@@ -298,6 +433,10 @@ void handleMainMenu() {
 void handleSubMenu() {
   lcd.clear();
   if (menu[menuIndex] == "Mulai Ukur") {
+    umur = Age_MIN;
+    idmicroDigits[0] = 0;
+    idmicroDigits[1] = 0;
+    idmicroDigits[2] = 0;
     isSettingAge = true;
     initialized = false;
     handleAgeInput(false, false);
@@ -314,11 +453,9 @@ void handleSubMenu() {
 bool debounceButton(Button& button) {
   int reading = digitalRead(button.pin);
   bool buttonPressed = false;
-
   if (reading != button.lastState) {
     button.lastDebounceTime = millis();
   }
-
   if ((millis() - button.lastDebounceTime) > DEBOUNCE_DELAY) {
     if (reading != button.state) {
       button.state = reading;
@@ -330,7 +467,6 @@ bool debounceButton(Button& button) {
       }
     }
   }
-
   button.lastState = reading;
   return buttonPressed;
 }
@@ -351,14 +487,11 @@ void handleAgeInput(bool button1Pressed, bool button3Pressed) {
     updateAgeDisplay();
     initialized = true;
     inputStage = 0;
-    umur = Age_MIN;
     return;
   }
-
   if (shouldRunBacaSensor) {
     return;
   }
-
   if (button1Pressed && millis() - lastButtonPressTime >= BUTTON_DELAY) {
     if (inputStage == 0) {
       umur += 10;
@@ -381,7 +514,6 @@ void handleAgeInput(bool button1Pressed, bool button3Pressed) {
     }
     lastButtonPressTime = millis();
   }
-
   if (button3Pressed) {
     if (inputStage == 0) {
       lcd.clear();
@@ -421,19 +553,14 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Pilih Ratusan");
-    idmicroDigits[0] = 0;
-    idmicroDigits[1] = 0;
-    idmicroDigits[2] = 0;
     updateIdmicroDisplay();
     initialized = true;
     idmicroInputStage = 0;
     return;
   }
-
   if (shouldRunBacaSensor) {
     return;
   }
-
   if (button1Pressed && millis() - lastButtonPressTime >= BUTTON_DELAY) {
     if (idmicroInputStage == 0) {
       idmicroDigits[0]++;
@@ -454,7 +581,6 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
     updateIdmicroDisplay();
     lastButtonPressTime = millis();
   }
-
   if (button3Pressed) {
     if (idmicroInputStage == 0) {
       lcd.clear();
@@ -487,10 +613,7 @@ void handleIdmicroInput(bool button1Pressed, bool button3Pressed) {
 }
 
 void bacasensorStep() {
-  HR = 0;
-  IR = 0;
   long irValue = particleSensor.getIR();
-
   if (irValue > 50000 && !fingerDetected) {
     delay(500);
     particleSensor.setPulseAmplitudeRed(64);
@@ -498,40 +621,29 @@ void bacasensorStep() {
     beatsPerMinute = 0;
     beatAvg = 0;
     irAvg = 0;
+    irSum = 0;
+    irCount = 0;
+    beatSum = 0;
+    beatCount = 0;
+    lastBeat = 0;
     interval = millis();
   } else if (irValue <= 50000 && fingerDetected) {
     delay(500);
-    particleSensor.setPulseAmplitudeRed(0x06);
+    particleSensor.setPulseAmplitudeRed(0x96);
     fingerDetected = false;
   }
-
   if (fingerDetected) {
     if (millis() - interval <= 30000) {
       tampilkan_hasil = false;
-
-      irValues[rateSpot] = irValue;
-
+      irSum += irValue;
+      irCount++;
       if (checkForBeat(irValue) == true) {
         long delta = millis() - lastBeat;
         lastBeat = millis();
-
         beatsPerMinute = 60 / (delta / 1000.0);
-
-        if (beatsPerMinute < 180 && beatsPerMinute > 50) {
-          rates[rateSpot] = (byte)beatsPerMinute;
-          rateSpot = (rateSpot + 1) % RATE_SIZE;
-
-          beatAvg = 0;
-          for (byte x = 0; x < RATE_SIZE; x++) {
-            beatAvg += rates[x];
-          }
-          beatAvg /= RATE_SIZE;
-
-          irAvg = 0;
-          for (byte x = 0; x < RATE_SIZE; x++) {
-            irAvg += irValue;
-          }
-          irAvg /= RATE_SIZE;
+        if (beatsPerMinute < 180 && beatsPerMinute > 40) {
+          beatSum += beatsPerMinute;
+          beatCount++;
         }
       }
       int progress = map(millis() - interval, 0, 30000, 0, 100);
@@ -541,16 +653,33 @@ void bacasensorStep() {
       lcd.print(progress);
       lcd.print("%");
     } else {
-      avgbpm = beatAvg;
-      avgir = irAvg;
-      copyValuee(avgbpm, HR);
-      copyValue(avgir, IR);
-      copyValuu(umur, umurr);
-      delay(100);
-      tampilkan_hasil = true;
+      if (beatCount > 0) {
+        avgbpm = beatSum / beatCount;
+      } else {
+        avgbpm = 0;
+      }
+      if (irCount > 0) {
+        avgir = irSum / irCount;
+      } else {
+        avgir = 0;
+      }
+      if (avgbpm > 40 && avgir > 50000) {
+        copyValuee(avgbpm, HR);
+        copyValue(avgir, IR);
+        copyValuu(umur, umurr);
+        delay(100);
+        tampilkan_hasil = true;
+      } else {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Gagal Membaca");
+        lcd.setCursor(0, 1);
+        lcd.print("Coba Lagi");
+        delay(2000);
+        returnToMainMenu();
+      }
     }
   }
-
   if (tampilkan_hasil) {
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -563,11 +692,9 @@ void bacasensorStep() {
     delay(2000);
     selesai_baca = true;
   }
-
   if (selesai_baca) {
     Vector3f inputData;
-    inputData << static_cast<float>(IR), static_cast<float>(umurr),
-    static_cast<float>(HR);
+    inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
     GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
     CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 3));
     ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 2));
@@ -583,21 +710,21 @@ void bacasensorStep() {
     lcd.print(" mg/dL");
     delay(4000);
     if (healthStatus == 0) {
-       lcd.clear();
-       lcd.setCursor(0, 0);
-       lcd.print("Chol: ");
-       lcd.print(CHOL);
-       lcd.print(" mg/dL");
-       lcd.setCursor(0, 1);
-       lcd.print("Status: Sakit");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Chol: ");
+      lcd.print(CHOL);
+      lcd.print(" mg/dL");
+      lcd.setCursor(0, 1);
+      lcd.print("Status: Sakit");
     } else if (healthStatus == 1) {
-       lcd.clear();
-       lcd.setCursor(0, 0);
-       lcd.print("Chol: ");
-       lcd.print(CHOL);
-       lcd.print(" mg/dL");
-       lcd.setCursor(0, 1);
-       lcd.print("Status: Sehat");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Chol: ");
+      lcd.print(CHOL);
+      lcd.print(" mg/dL");
+      lcd.setCursor(0, 1);
+      lcd.print("Status: Sehat");
     }
     saveDataToJson();
     delay(3000);
@@ -611,7 +738,6 @@ void bacasensorStep() {
 void saveDataToJson() {
   File file = LittleFS.open(var2Path, FILE_READ);
   DynamicJsonDocument doc(1024);
-
   if (file) {
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
@@ -621,7 +747,6 @@ void saveDataToJson() {
   } else {
     doc["sensor"] = JsonObject();
   }
-
   String timestamp = getTimestamp();
   JsonObject sensorData = doc["sensor"].createNestedObject(timestamp);
   sensorData["idmicro"] = idmicro;
@@ -633,23 +758,20 @@ void saveDataToJson() {
   sensorData["alter"] = umur;
   sensorData["stat"] = healthStatus;
   sensorData["timestamp"] = timestamp;
-
   file = LittleFS.open(var2Path, FILE_WRITE);
   if (!file) {
     return;
   }
-
   serializeJson(doc, file);
   file.close();
   Serial.println("Data berhasil disimpan ke file JSON di LittleFS");
 }
 
 String getTimestamp() {
-  char dateBuffer[25];
+  char dateBuffer[26];
   bool isCentury = false;
   bool is12HourFormat = false;
   bool isPM = false;
-
   snprintf(dateBuffer, sizeof(dateBuffer), "%04u-%02u-%02uT%02u:%02u:%02u+07:00",
            myRTC.getYear() + 2000, myRTC.getMonth(isCentury), myRTC.getDate(),
            myRTC.getHour(is12HourFormat, isPM), myRTC.getMinute(),
@@ -670,7 +792,6 @@ void initWiFi() {
     if (!WiFi.config(localIP, localGateway, subnet)) {
     }
   }
-
   WiFi.begin(ssid.c_str(), pass.c_str());
   unsigned long currentMillis = millis();
   previousMillis = currentMillis;
@@ -683,19 +804,16 @@ void initWiFi() {
   syncTimeFromNTP();
   setupFirebase();
   kirimDataKeFirebase();
-  delay(1000);
   ESP.restart();
 }
 
 void setupFirebase() {
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
-
   if (Firebase.signUp(&config, &auth, "", "")) {
     Firebase.reconnectWiFi(true);
   } else {
   }
-
   config.token_status_callback = tokenStatusCallback;
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
@@ -705,23 +823,18 @@ void kirimDataKeFirebase() {
   if (!Firebase.ready()) {
     return;
   }
-
   File file = LittleFS.open(var2Path, FILE_READ);
   if (!file) {
     return;
   }
-
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, file);
   file.close();
-
   if (error) {
     return;
   }
-
   JsonObject sensorData = doc["sensor"];
   bool allDataSent = true;
-
   for (JsonPair kv : sensorData) {
     String timestamp = kv.key().c_str();
     JsonObject data = kv.value();
@@ -735,20 +848,23 @@ void kirimDataKeFirebase() {
     json.set(alterPath.c_str(), data["alter"].as<String>());
     json.set(statPath.c_str(), data["stat"].as<String>());
     json.set(timePath, timestamp);
-
     String databasePath = "/sensor";
     String parentPath = databasePath + "/" + timestamp;
-
     if (Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json)) {
       Serial.println("Data JSON berhasil dikirim di firebase");
     } else {
       allDataSent = false;
     }
   }
-
   if (allDataSent) {
     deleteFile(LittleFS, var2Path);
     Serial.print("Data JSON telah dihapus dari memori flash");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Data Terkirim");
+    lcd.setCursor(0, 1);
+    lcd.print("Ke Firebase!");
+    delay(2000);
   }
 }
 
@@ -756,13 +872,10 @@ void startWiFiSetup() {
   WiFi.softAP("ESP-WIFI-MANAGER", NULL);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
-  Serial.println(IP); 
-
+  Serial.println(IP);
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/wifimanager.html", "text/html");
+    request->send_P(200, "text/html", index_html);
   });
-
-  server.serveStatic("/", LittleFS, "/");
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) {
     int params = request->params();
     for (int i = 0; i < params; i++) {
@@ -790,7 +903,12 @@ void startWiFiSetup() {
         200, "text/plain",
         "Selesai. ESP akan restart, hubungkan ke router Anda dan buka alamat "
         "IP: " + ip);
-    delay(3000);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Config");
+    lcd.setCursor(0, 1);
+    lcd.print("Tersimpan!");
+    delay(2000);
     ESP.restart();
   });
   server.begin();
@@ -799,11 +917,9 @@ void startWiFiSetup() {
 void syncTimeFromNTP() {
   configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
   struct tm timeinfo;
-
   if (!getLocalTime(&timeinfo)) {
     return;
   }
-
   myRTC.setYear(timeinfo.tm_year + 1900 - 2000);
   myRTC.setMonth(timeinfo.tm_mon + 1);
   myRTC.setDate(timeinfo.tm_mday);
@@ -826,11 +942,10 @@ void displayStoredData() {
 }
 
 uint8_t cekStatusKesehatan(uint8_t GLU, uint8_t CHOL, float ACD) {
-    bool asamUratNormal = (ACD >= 3.5f && ACD <= 7.0f);
-    bool kolesterolNormal = (CHOL < 200);
-    bool gulaDarahNormal = (GLU >= 70 && GLU <= 140);
-
-    return (asamUratNormal && kolesterolNormal && gulaDarahNormal) ? 1 : 0;
+  bool asamUratNormal = (ACD >= 3.5f && ACD <= 7.0f);
+  bool kolesterolNormal = (CHOL < 200);
+  bool gulaDarahNormal = (GLU >= 70 && GLU <= 140);
+  return (asamUratNormal && kolesterolNormal && gulaDarahNormal) ? 1 : 0;
 }
 
 uint8_t roundUpToUint8(float value) {
@@ -850,146 +965,119 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
   Eigen::VectorXf a1;
   float a2;
   float y1_output;
-
   const float input_ymin = 0.0f;
   const float output_ymin = 0.0f;
-
   switch (network_id) {
     case 1: {
       Eigen::Vector3f x_offset(56543.0f, 24.0f, 60.0f);
       Eigen::Vector3f gain(1.99992000319987e-05f, 0.0188679245283019f,
-                           0.024390243902439f);
-
+                             0.024390243902439f);
       Eigen::VectorXf b1(5);
       b1 << 0.043478314201888204615f, 0.045332591642713096491f,
-          -0.22422832665006922626f, -0.10298572226547086927f,
-          -0.020543463362604305611f;
+        -0.22422832665006922626f, -0.10298572226547086927f,
+        -0.020543463362604305611f;
       Eigen::MatrixXf IW1_1(5, 3);
       IW1_1 << -0.15040868318387079494f, -0.19201539462629302335f,
-          -0.15899545524421829223f, -0.15466743692436682456f,
-          -0.19760650735482382379f, -0.16369386148328080033f,
-          0.21563835158211197562f, 0.32556422845982946335f,
-          0.29314867821981638318f, 0.18160375245888715767f,
-          0.24912212264468475142f, 0.21000944829333154096f,
-          0.11972911628732171851f, 0.14768162356584002559f,
-          0.12178649633391974705f;
-
+        -0.15899545524421829223f, -0.15466743692436682456f,
+        -0.19760650735482382379f, -0.16369386148328080033f,
+        0.21563835158211197562f, 0.32556422845982946335f,
+        0.29314867821981638318f, 0.18160375245888715767f,
+        0.24912212264468475142f, 0.21000944829333154096f,
+        0.11972911628732171851f, 0.14768162356584002559f,
+        0.12178649633391974705f;
       float b2 = -0.004746110129271247785f;
       Eigen::RowVectorXf LW2_1(5);
       LW2_1 << -0.3090060562877842143f, -0.31274375113945251936f,
-          0.5983171408725674878f, 0.43022673601241495644f,
-          0.2376365869375564599f;
-
+        0.5983171408725674878f, 0.43022673601241495644f,
+        0.2376365869375564599f;
       float y_gain = 0.0111111111111111f;
       float y_xoffset = 95.0f;
-
       xp1 = (x - x_offset).array() * gain.array() + input_ymin;
-
       Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
       a1.resize(n1.size());
       for (int i = 0; i < n1.size(); ++i) {
         a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
       }
-
       a2 = LW2_1 * a1 + b2;
-
       y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
-
       break;
     }
 
     case 2: {
       Eigen::Vector3f x_offset(58124.0f, 31.0f, 60.0f);
       Eigen::Vector3f gain(2.01987557566454e-05f, 0.0208333333333333f,
-                           0.0232558139534884f);
-
+                             0.0232558139534884f);
       Eigen::VectorXf b1(5);
       b1 << -0.040023234152423231569f, 0.040023244160910798062f,
-          -0.040023244902930021905f, 0.040023254155707996271f,
-          -0.040023248486739465557f;
+        -0.040023244902930021905f, 0.040023254155707996271f,
+        -0.040023248486739465557f;
       Eigen::MatrixXf IW1_1(5, 3);
       IW1_1 << 0.20554751351572525531f, 0.12053672989609462429f,
-          0.21052588565821947486f, -0.20554752218654617768f, 
-          -0.12053673177065263311f, -0.21052588755705048396f, 
-          0.2055475303154167821f, 0.12053673697757459615f,
-          0.21052589717051167773f, -0.20554754097468952434f, 
-          -0.12053674049997620266f, -0.21052590227057590977f, 
-          0.2055475345499658546f, 0.12053673841362209929f,
-          0.2105258992799771689f;
-
+        0.21052588565821947486f, -0.20554752218654617768f,
+        -0.12053673177065263311f, -0.21052588755705048396f,
+        0.2055475303154167821f, 0.12053673697757459615f,
+        0.21052589717051167773f, -0.20554754097468952434f,
+        -0.12053674049997620266f, -0.21052590227057590977f,
+        0.2055475345499658546f, 0.12053673841362209929f,
+        0.2105258992799771689f;
       float b2 = 0.08601257368366782563f;
       Eigen::RowVectorXf LW2_1(5);
       LW2_1 << 0.34970358559638287099f, -0.34970360773312308966f,
-          0.34970361041289860227f, -0.34970363124485964734f,
-          0.34970361849628894824f;
-
+        0.34970361041289860227f, -0.34970363124485964734f,
+        0.34970361849628894824f;
       float y_gain = 0.222222222222222f;
       float y_xoffset = 2.4f;
-
       xp1 = (x - x_offset).array() * gain.array() + input_ymin;
-
       Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
       a1.resize(n1.size());
       for (int i = 0; i < n1.size(); ++i) {
         a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
       }
-
       a2 = LW2_1 * a1 + b2;
-
       y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
-
       break;
     }
 
     case 3: {
       Eigen::Vector3f x_offset(58124.0f, 25.0f, 60.0f);
       Eigen::Vector3f gain(2.0652196361083e-05f, 0.0185185185185185f,
-                           0.0232558139534884f);
-
+                             0.0232558139534884f);
       Eigen::VectorXf b1(5);
       b1 << 0.054253637728892738223f, 0.054253716535899769446f,
-          -0.054253724693496700737f, 0.054253738543225793478f,
-          -0.054253724411656552296f;
+        -0.054253724693496700737f, 0.054253738543225793478f,
+        -0.054253724411656552296f;
       Eigen::MatrixXf IW1_1(5, 3);
       IW1_1 << -0.19201222264032605236f, -0.2161493748276628879f,
-          -0.17137429011668622869f, -0.19201232566285278414f,
-          -0.21614950858101003583f, -0.17137438662408638335f, 
-          0.19201230866404364606f, 0.21614950008515446123f, 
-          0.17137437494174911912f, -0.19201227274336196693f, 
-          -0.21614947995887770493f, -0.17137434957630559573f,
-          0.19201230559940885012f, 0.21614949742931777177f,
-          0.17137437248431902637f;
-
+        -0.17137429011668622869f, -0.19201232566285278414f,
+        -0.21614950858101003583f, -0.17137438662408638335f,
+        0.19201230866404364606f, 0.21614950008515446123f,
+        0.17137437494174911912f, -0.19201227274336196693f,
+        -0.21614947995887770493f, -0.17137434957630559573f,
+        0.19201230559940885012f, 0.21614949742931777177f,
+        0.17137437248431902637f;
       float b2 = 0.036625506519114281456f;
       Eigen::RowVectorXf LW2_1(5);
       LW2_1 << -0.36182559629564642334f, -0.3618257745877578313f,
-          0.36182579099826850388f, -0.36182581833756233269f,
-          0.36182579016130633764f;
-
+        0.36182579099826850388f, -0.36182581833756233269f,
+        0.36182579016130633764f;
       float y_gain = 0.00892857142857143f;
       float y_xoffset = 123.0f;
-
       xp1 = (x - x_offset).array() * gain.array() + input_ymin;
-
       Eigen::VectorXf n1 = IW1_1 * xp1 + b1;
       a1.resize(n1.size());
       for (int i = 0; i < n1.size(); ++i) {
         a1[i] = 2.0f / (1.0f + exp(-2.0f * n1[i])) - 1.0f;
       }
-
       a2 = LW2_1 * a1 + b2;
-
       y1_output = (a2 - output_ymin) / y_gain + y_xoffset;
-
       break;
     }
 
     default:
       Serial.print("Error: Invalid network_id provided to "
-                   "myNeuralNetworkFunction: ");
+                     "myNeuralNetworkFunction: ");
       Serial.println(network_id);
       return -1.0f;
   }
-
   return y1_output;
 }
