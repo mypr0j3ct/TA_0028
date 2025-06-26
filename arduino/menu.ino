@@ -300,6 +300,7 @@ void setup() {
   particleSensor.setPulseAmplitudeGreen(0xff);
   showMainMenu();
   startTime = millis();
+  displayStoredData();
 }
 
 void loop() {
@@ -445,7 +446,7 @@ void handleSubMenu() {
     initWiFi();
   } else if (menu[menuIndex] == "Setting WiFi") {
     lcd.print("Mengatur WiFi...");
-    displayStoredData();
+    startWiFiSetup();
   }
   inSubMenu = true;
 }
@@ -873,6 +874,11 @@ void startWiFiSetup() {
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ketik Alamat");
+  lcd.setCursor(0, 1);
+  lcd.print(IP);
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html);
   });
@@ -938,7 +944,6 @@ void displayStoredData() {
     Serial.println(storedData);
     delay(1000);
   }
-  startWiFiSetup();
 }
 
 uint8_t cekStatusKesehatan(uint8_t GLU, uint8_t CHOL, float ACD) {
