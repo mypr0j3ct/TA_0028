@@ -263,6 +263,7 @@ void updateAgeDisplay();
 void updateIdmicroDisplay();
 void bacasensorStep();
 String getTimestamp();
+void displaySSID();
 void displayStoredData();
 uint8_t roundUpToUint8(float value);
 bool debounceButton(Button& button);
@@ -300,7 +301,8 @@ void setup() {
   particleSensor.setPulseAmplitudeGreen(0xff);
   showMainMenu();
   startTime = millis();
-  displayStoredData();
+  //displayStoredData();
+  displaySSID();
 }
 
 void loop() {
@@ -1085,4 +1087,27 @@ float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id) {
       return -1.0f;
   }
   return y1_output;
+}
+
+void displaySSID() {
+  Serial.println("\n==================================");
+  Serial.println("Membaca Kredensial WiFi Tersimpan");
+  
+  String savedSSID = readFile(LittleFS, ssidPath);
+  String savedPass = readFile(LittleFS, passPath);
+
+  if (savedSSID != "") {
+    Serial.print("SSID: ");
+    Serial.println(savedSSID);
+  } else {
+    Serial.println("SSID belum di-setting.");
+  }
+
+  if (savedPass != "") {
+    Serial.print("Password: ");
+    Serial.println(savedPass);
+  } else {
+    Serial.println("Password belum di-setting.");
+  }
+  Serial.println("==================================");
 }
