@@ -310,23 +310,23 @@ void loop() {
   bool button3Pressed = debounceButton(button3);
   if (!inSubMenu && button1Pressed) {
     handleMainMenu();
-  }
-  if (isSettingAge) {
-    handleAgeInput(button1Pressed, button3Pressed);
-  } else if (isSettingIdmicro) {
-    handleIdmicroInput(button1Pressed, button3Pressed);
-  }
-  if (button3Pressed) {
-    if (!inSubMenu && cursorRow == 1) {
-      handleSubMenu();
-    } else if (inSubMenu && !isSettingAge && !isSettingIdmicro &&
-               !shouldRunBacaSensor) {
-      returnToMainMenu();
-    }
-  }
-  if (shouldRunBacaSensor) {
-    bacasensorStep();
-  }
+   }
+   if (isSettingAge) {
+     handleAgeInput(button1Pressed, button3Pressed);
+   } else if (isSettingIdmicro) {
+     handleIdmicroInput(button1Pressed, button3Pressed);
+   }
+   if (button3Pressed) {
+     if (!inSubMenu && cursorRow == 1) {
+       handleSubMenu();
+     } else if (inSubMenu && !isSettingAge && !isSettingIdmicro &&
+                !shouldRunBacaSensor) {
+       returnToMainMenu();
+     }
+   }
+   if (shouldRunBacaSensor) {
+     bacasensorStep();
+   }
 }
 
 void initLittleFS() {
@@ -697,7 +697,8 @@ void bacasensorStep() {
   }
   if (selesai_baca) {
     Vector3f inputData;
-    inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
+    //inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
+    inputData << static_cast<float>(98084), static_cast<float>(52), static_cast<float>(75);
     GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
     CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 3));
     ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 2));
@@ -711,7 +712,7 @@ void bacasensorStep() {
     lcd.print("Acid: ");
     lcd.print(ACD, 1);
     lcd.print(" mg/dL");
-    delay(4000);
+    delay(2000);
     if (healthStatus == 0) {
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -730,7 +731,7 @@ void bacasensorStep() {
       lcd.print("Status: Sehat");
     }
     saveDataToJson();
-    delay(3000);
+    delay(2000);
     selesai_baca = false;
     shouldRunBacaSensor = false;
     String storedData = readFile2(LittleFS, var2Path);
@@ -824,20 +825,42 @@ void setupFirebase() {
 
 void kirimDataKeFirebase() {
   if (!Firebase.ready()) {
+    Serial.println("Firebase tidak siap.");
     return;
   }
   File file = LittleFS.open(var2Path, FILE_READ);
   if (!file) {
+    Serial.println("Gagal membuka file data atau file tidak ada.");
+    lcd.clear();
+    lcd.print("Tidak Ada Data");
+    delay(2000);
     return;
   }
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument doc(2048); // Kapasitas disesuaikan jika perlu
   DeserializationError error = deserializeJson(doc, file);
   file.close();
   if (error) {
+    Serial.print("deserializeJson() gagal: ");
+    Serial.println(error.c_str());
     return;
   }
+  
   JsonObject sensorData = doc["sensor"];
+  if (sensorData.isNull() || sensorData.size() == 0) {
+      Serial.println("Tidak ada data sensor untuk dikirim.");
+      lcd.clear();
+      lcd.print("Tidak Ada Data");
+      delay(2000);
+      return;
+  }
+  
   bool allDataSent = true;
+  
+  // ==================== MODIFIKASI DIMULAI ====================
+  unsigned long startTime = millis(); // Catat waktu mulai
+  int dataCount = sensorData.size();  // Hitung jumlah data yang akan dikirim
+  // ==========================================================
+
   for (JsonPair kv : sensorData) {
     String timestamp = kv.key().c_str();
     JsonObject data = kv.value();
@@ -854,20 +877,54 @@ void kirimDataKeFirebase() {
     String databasePath = "/sensor";
     String parentPath = databasePath + "/" + timestamp;
     if (Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json)) {
-      Serial.println("Data JSON berhasil dikirim di firebase");
+      Serial.print("Data dengan timestamp ");
+      Serial.print(timestamp);
+      Serial.println(" berhasil dikirim ke Firebase.");
     } else {
+      Serial.print("Gagal mengirim data dengan timestamp ");
+      Serial.print(timestamp);
+      Serial.println(". Error: " + fbdo.errorReason());
       allDataSent = false;
     }
   }
+
+  // ==================== MODIFIKASI DIMULAI ====================
+  unsigned long endTime = millis(); // Catat waktu selesai
+  unsigned long duration = endTime - startTime; // Hitung durasi
+
+  Serial.println("\n=============================================");
+  Serial.println("          HASIL PENGIRIMAN DATA          ");
+  Serial.println("---------------------------------------------");
+  Serial.print("Jumlah data yang dikirim : ");
+  Serial.println(dataCount);
+  Serial.print("Waktu total pengiriman   : ");
+  Serial.print(duration);
+  Serial.println(" ms");
+  if (dataCount > 0) {
+    Serial.print("Waktu rata-rata per data : ");
+    Serial.print((float)duration / dataCount);
+    Serial.println(" ms");
+  }
+  Serial.println("=============================================\n");
+  // ==================== MODIFIKASI SELESAI ====================
+
   if (allDataSent) {
     deleteFile(LittleFS, var2Path);
-    Serial.print("Data JSON telah dihapus dari memori flash");
+    Serial.println("Semua data terkirim, file JSON telah dihapus dari memori flash.");
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Data Terkirim");
     lcd.setCursor(0, 1);
     lcd.print("Ke Firebase!");
     delay(2000);
+  } else {
+    Serial.println("Beberapa data gagal dikirim. File tidak akan dihapus.");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Gagal Kirim");
+    lcd.setCursor(0, 1);
+    lcd.print("Cek Serial");
+    delay(3000);
   }
 }
 
@@ -911,12 +968,6 @@ void startWiFiSetup() {
         200, "text/plain",
         "Selesai. ESP akan restart, hubungkan ke router Anda dan buka alamat "
         "IP: " + ip);
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("WiFi Config");
-    lcd.setCursor(0, 1);
-    lcd.print("Tersimpan!");
-    delay(2000);
     ESP.restart();
   });
   server.begin();
