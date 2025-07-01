@@ -170,7 +170,7 @@ struct Button {
 };
 
 const uint8_t Age_MIN = 20;
-const uint8_t Age_MAX = 60;
+const uint8_t Age_MAX = 80;
 const byte RATE_SIZE = 4;
 const unsigned long BUTTON_DELAY = 200;
 const long intervalWifi = 10000;
@@ -301,7 +301,7 @@ void setup() {
   particleSensor.setPulseAmplitudeGreen(0xff);
   showMainMenu();
   startTime = millis();
-  //displayStoredData();
+  displayStoredData();
   displaySSID();
 }
 
@@ -531,7 +531,7 @@ void handleAgeInput(bool button1Pressed, bool button3Pressed) {
       lcd.setCursor(0, 1);
       lcd.print(umur);
       lcd.print(" tahun");
-      delay(1000);
+      delay(1500);
       inputStage = 2;
       isSettingAge = false;
       isSettingIdmicro = true;
@@ -670,7 +670,6 @@ void bacasensorStep() {
         copyValuee(avgbpm, HR);
         copyValue(avgir, IR);
         copyValuu(umur, umurr);
-        delay(100);
         tampilkan_hasil = true;
       } else {
         lcd.clear();
@@ -678,7 +677,7 @@ void bacasensorStep() {
         lcd.print("Gagal Membaca");
         lcd.setCursor(0, 1);
         lcd.print("Coba Lagi");
-        delay(2000);
+        delay(3000);
         returnToMainMenu();
       }
     }
@@ -692,13 +691,13 @@ void bacasensorStep() {
     lcd.print("HR: ");
     lcd.print(HR);
     lcd.print(" bpm");
-    delay(2000);
+    delay(3000);
     selesai_baca = true;
   }
   if (selesai_baca) {
     Vector3f inputData;
     //inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
-    inputData << static_cast<float>(98084), static_cast<float>(52), static_cast<float>(75);
+    inputData << static_cast<float>(90000), static_cast<float>(80), static_cast<float>(100);
     GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
     CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 3));
     ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 2));
@@ -712,7 +711,7 @@ void bacasensorStep() {
     lcd.print("Acid: ");
     lcd.print(ACD, 1);
     lcd.print(" mg/dL");
-    delay(2000);
+    delay(3000);
     if (healthStatus == 0) {
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -731,7 +730,7 @@ void bacasensorStep() {
       lcd.print("Status: Sehat");
     }
     saveDataToJson();
-    delay(2000);
+    delay(3000);
     selesai_baca = false;
     shouldRunBacaSensor = false;
     String storedData = readFile2(LittleFS, var2Path);
@@ -833,10 +832,10 @@ void kirimDataKeFirebase() {
     Serial.println("Gagal membuka file data atau file tidak ada.");
     lcd.clear();
     lcd.print("Tidak Ada Data");
-    delay(2000);
+    delay(500);
     return;
   }
-  DynamicJsonDocument doc(2048); // Kapasitas disesuaikan jika perlu
+  DynamicJsonDocument doc(2048); 
   DeserializationError error = deserializeJson(doc, file);
   file.close();
   if (error) {
@@ -850,17 +849,13 @@ void kirimDataKeFirebase() {
       Serial.println("Tidak ada data sensor untuk dikirim.");
       lcd.clear();
       lcd.print("Tidak Ada Data");
-      delay(2000);
+      delay(500);
       return;
   }
   
   bool allDataSent = true;
-  
-  // ==================== MODIFIKASI DIMULAI ====================
-  unsigned long startTime = millis(); // Catat waktu mulai
-  int dataCount = sensorData.size();  // Hitung jumlah data yang akan dikirim
-  // ==========================================================
-
+  unsigned long startTime = millis(); 
+  int dataCount = sensorData.size();  
   for (JsonPair kv : sensorData) {
     String timestamp = kv.key().c_str();
     JsonObject data = kv.value();
@@ -887,11 +882,8 @@ void kirimDataKeFirebase() {
       allDataSent = false;
     }
   }
-
-  // ==================== MODIFIKASI DIMULAI ====================
-  unsigned long endTime = millis(); // Catat waktu selesai
-  unsigned long duration = endTime - startTime; // Hitung durasi
-
+  unsigned long endTime = millis(); 
+  unsigned long duration = endTime - startTime; 
   Serial.println("\n=============================================");
   Serial.println("          HASIL PENGIRIMAN DATA          ");
   Serial.println("---------------------------------------------");
@@ -906,8 +898,6 @@ void kirimDataKeFirebase() {
     Serial.println(" ms");
   }
   Serial.println("=============================================\n");
-  // ==================== MODIFIKASI SELESAI ====================
-
   if (allDataSent) {
     deleteFile(LittleFS, var2Path);
     Serial.println("Semua data terkirim, file JSON telah dihapus dari memori flash.");
@@ -916,7 +906,7 @@ void kirimDataKeFirebase() {
     lcd.print("Data Terkirim");
     lcd.setCursor(0, 1);
     lcd.print("Ke Firebase!");
-    delay(2000);
+    delay(3000);
   } else {
     Serial.println("Beberapa data gagal dikirim. File tidak akan dihapus.");
     lcd.clear();
@@ -991,11 +981,11 @@ void displayStoredData() {
   String storedData = readFile2(LittleFS, var2Path);
   if (storedData == "") {
     Serial.println("Tidak ada data tersimpan.");
-    delay(1000);
+    delay(500);
   } else {
     Serial.println("Data tersimpan:");
     Serial.println(storedData);
-    delay(1000);
+    delay(500);
   }
 }
 
