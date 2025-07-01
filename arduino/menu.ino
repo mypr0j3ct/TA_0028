@@ -696,8 +696,8 @@ void bacasensorStep() {
   }
   if (selesai_baca) {
     Vector3f inputData;
-    //inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
-    inputData << static_cast<float>(90000), static_cast<float>(80), static_cast<float>(100);
+    inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR);
+    //inputData << static_cast<float>(90000), static_cast<float>(80), static_cast<float>(100);
     GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
     CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 3));
     ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 2));
@@ -992,7 +992,7 @@ void displayStoredData() {
 uint8_t cekStatusKesehatan(uint8_t GLU, uint8_t CHOL, float ACD) {
   bool asamUratNormal = (ACD >= 3.5f && ACD <= 7.0f);
   bool kolesterolNormal = (CHOL < 200);
-  bool gulaDarahNormal = (GLU >= 70 && GLU <= 140);
+  bool gulaDarahNormal = (GLU >= 70 && GLU <= 200);
   return (asamUratNormal && kolesterolNormal && gulaDarahNormal) ? 1 : 0;
 }
 
